@@ -19,6 +19,7 @@ services:
       - db
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/nameapp
+      - FLASK_APP=app.py
 
 volumes:
   postgres_data:
