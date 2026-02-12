@@ -1,20 +1,21 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Stage 1: Build React frontend
+FROM node:20-slim AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
-# Set the working directory in the container
+# Stage 2: Python backend + static files
+FROM python:3.9-slim
 WORKDIR /app
 
-# Copy the dependencies file to the working directory
-COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY . .
+COPY backend/ .
+COPY --from=frontend-build /frontend/build /app/static
 
-# Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-# Wait for DB, run migrations, then start the app
 CMD ["sh", "entrypoint.sh"]

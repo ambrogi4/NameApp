@@ -6,7 +6,8 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 import time
 
-app = Flask(__name__)
+static_dir = os.path.join(os.path.dirname(__file__), 'static')
+app = Flask(__name__, static_folder=static_dir, static_url_path='')
 CORS(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
@@ -322,6 +323,18 @@ def delete_activity(activity_id):
     db.session.delete(activity)
     db.session.commit()
     return jsonify({'message': 'Activity deleted'})
+
+
+# ---------------------------------------------------------------------------
+# Serve React frontend
+# ---------------------------------------------------------------------------
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    if path and os.path.exists(os.path.join(app.static_folder, path)):
+        return app.send_static_file(path)
+    return app.send_static_file('index.html')
 
 
 # ---------------------------------------------------------------------------
