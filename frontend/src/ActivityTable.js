@@ -7,6 +7,8 @@ import SelectCellEditor from './SelectCellEditor';
 export default function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, onClearPrefill }) {
   const gridRef = useRef(null);
   const [newRow, setNewRow] = useState(createEmptyRow(ACTIVITY_FIELDS));
+  const newRowRef = useRef(newRow);
+  newRowRef.current = newRow;
 
   useEffect(() => {
     if (prefillContactId) {
@@ -116,16 +118,17 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
   }), []);
 
   const handleSaveNew = useCallback(() => {
+    const row = newRowRef.current;
     const data = {
-      ...newRow,
-      contact_id: newRow.contact_id ? Number(newRow.contact_id) : null,
-      content_id: newRow.content_id ? Number(newRow.content_id) : null,
-      activity_date: newRow.activity_date || null,
+      ...row,
+      contact_id: row.contact_id ? Number(row.contact_id) : null,
+      content_id: row.content_id ? Number(row.content_id) : null,
+      activity_date: row.activity_date || null,
     };
     onCreateActivity(data);
     setNewRow(createEmptyRow(ACTIVITY_FIELDS));
     if (onClearPrefill) onClearPrefill();
-  }, [newRow, onCreateActivity, onClearPrefill]);
+  }, [onCreateActivity, onClearPrefill]);
 
   const onCellValueChanged = useCallback((params) => {
     if (isPinnedRow(params)) {

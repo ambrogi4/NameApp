@@ -6,6 +6,8 @@ import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gr
 export default function ContentTable({ content, onUpdateContent, onCreateContent, onDelete }) {
   const gridRef = useRef(null);
   const [newRow, setNewRow] = useState(createEmptyRow(CONTENT_FIELDS));
+  const newRowRef = useRef(newRow);
+  newRowRef.current = newRow;
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
@@ -55,10 +57,11 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
   }), []);
 
   const handleSaveNew = useCallback(() => {
-    const data = { ...newRow, publish_date: newRow.publish_date || null };
+    const row = newRowRef.current;
+    const data = { ...row, publish_date: row.publish_date || null };
     onCreateContent(data);
     setNewRow(createEmptyRow(CONTENT_FIELDS));
-  }, [newRow, onCreateContent]);
+  }, [onCreateContent]);
 
   const onCellValueChanged = useCallback((params) => {
     if (isPinnedRow(params)) {

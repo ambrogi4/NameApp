@@ -6,6 +6,8 @@ import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 export default function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDelete, onNewActivity }) {
   const gridRef = useRef(null);
   const [newRow, setNewRow] = useState(createEmptyRow(CONTACT_FIELDS));
+  const newRowRef = useRef(newRow);
+  newRowRef.current = newRow;
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
@@ -86,12 +88,12 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
   }), []);
 
   const handleSaveNew = useCallback(() => {
-    const data = { ...newRow };
+    const data = { ...newRowRef.current };
     data.index_1 = data.index_1 === '' ? null : data.index_1;
     data.index_2 = data.index_2 === '' ? null : data.index_2;
     onCreateContact(data);
     setNewRow(createEmptyRow(CONTACT_FIELDS));
-  }, [newRow, onCreateContact]);
+  }, [onCreateContact]);
 
   const onCellValueChanged = useCallback((params) => {
     if (isPinnedRow(params)) {
