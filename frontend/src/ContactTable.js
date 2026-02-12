@@ -174,6 +174,28 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
 
   const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
 
+  const GROUP_KEY = 'contactTable_columnGroupState';
+  const COL_KEY = 'contactTable_columnState';
+
+  const onGridReady = useCallback((params) => {
+    const savedGroup = localStorage.getItem(GROUP_KEY);
+    if (savedGroup) {
+      try { params.api.setColumnGroupState(JSON.parse(savedGroup)); } catch (e) { /* ignore */ }
+    }
+    const savedCol = localStorage.getItem(COL_KEY);
+    if (savedCol) {
+      try { params.api.applyColumnState({ state: JSON.parse(savedCol), applyOrder: true }); } catch (e) { /* ignore */ }
+    }
+  }, []);
+
+  const onColumnGroupOpened = useCallback((params) => {
+    localStorage.setItem(GROUP_KEY, JSON.stringify(params.api.getColumnGroupState()));
+  }, []);
+
+  const saveColumnState = useCallback((params) => {
+    localStorage.setItem(COL_KEY, JSON.stringify(params.api.getColumnState()));
+  }, []);
+
   return (
     <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 500 }} tabIndex={0}>
       <AgGridReact
@@ -184,6 +206,12 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
         defaultColDef={defaultColDef}
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
+        onGridReady={onGridReady}
+        onColumnGroupOpened={onColumnGroupOpened}
+        onSortChanged={saveColumnState}
+        onColumnResized={saveColumnState}
+        onColumnMoved={saveColumnState}
+        onFilterChanged={saveColumnState}
         getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
         stopEditingWhenCellsLoseFocus={true}
       />

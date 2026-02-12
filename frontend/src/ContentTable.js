@@ -76,6 +76,22 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
 
   const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
 
+  const STORAGE_KEY = 'contentTable_columnState';
+
+  const onGridReady = useCallback((params) => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        params.api.applyColumnState({ state: JSON.parse(saved), applyOrder: true });
+      } catch (e) { /* ignore bad data */ }
+    }
+  }, []);
+
+  const saveColumnState = useCallback((params) => {
+    const state = params.api.getColumnState();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, []);
+
   return (
     <div className="ag-theme-balham" style={{ width: '100%', height: 500 }}>
       <AgGridReact
@@ -86,6 +102,11 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
         defaultColDef={defaultColDef}
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
+        onGridReady={onGridReady}
+        onSortChanged={saveColumnState}
+        onColumnResized={saveColumnState}
+        onColumnMoved={saveColumnState}
+        onFilterChanged={saveColumnState}
         getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
         stopEditingWhenCellsLoseFocus={true}
       />
