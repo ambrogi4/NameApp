@@ -109,23 +109,11 @@
   color: #333;
 }
 
-/* Table styling */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20px auto;
-  max-width: 1200px;
-}
-
-table th, table td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-}
-
-table th {
-  background-color: #f2f2f2;
-  font-weight: bold;
+/* AG Grid compact overrides */
+.ag-theme-balham {
+  --ag-row-height: 25px;
+  --ag-header-height: 28px;
+  --ag-font-size: 13px;
 }
 
 /* Button styling */
@@ -172,4 +160,13 @@ button[type="submit"]:hover {
 
 .delete-btn:hover {
   background-color: #da190b;
+}
+
+.activity-btn {
+  background-color: #FF9800;
+  color: white;
+}
+
+.activity-btn:hover {
+  background-color: #F57C00;
 }

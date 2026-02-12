@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { AllCommunityModule } from 'ag-grid-community';
+import { AgGridProvider } from 'ag-grid-react';
 import {
   fetchContacts, createContact, updateContact, deleteContact,
   fetchContent, createContent, updateContent, deleteContent,
@@ -6,20 +8,33 @@ import {
 } from './apiService';
 import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
-import ContentForm from './ContentForm';
 import ContentTable from './ContentTable';
-import ActivityForm from './ActivityForm';
 import ActivityTable from './ActivityTable';
 import './App.css';
 
 function App() {
-  const [tab, setTab] = useState('contacts');
+  const TAB_ORDER = ['activities', 'contacts', 'content'];
+  const [tab, setTab] = useState('activities');
   const [contacts, setContacts] = useState([]);
   const [content, setContent] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [editingContact, setEditingContact] = useState(null);
-  const [editingContent, setEditingContent] = useState(null);
-  const [editingActivity, setEditingActivity] = useState(null);
+  const [prefillContactId, setPrefillContactId] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!e.altKey) return;
+      const idx = TAB_ORDER.indexOf(tab);
+      if (e.key === 'ArrowUp' && idx > 0) {
+        e.preventDefault();
+        setTab(TAB_ORDER[idx - 1]);
+      } else if (e.key === 'ArrowDown' && idx < TAB_ORDER.length - 1) {
+        e.preventDefault();
+        setTab(TAB_ORDER[idx + 1]);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tab, TAB_ORDER]);
 
   useEffect(() => {
     fetchContacts().then(setContacts).catch(console.error);
@@ -28,19 +43,22 @@ function App() {
   }, []);
 
   // --- Contact handlers ---
-  const handleSaveContact = (data) => {
-    if (editingContact) {
-      updateContact(editingContact.id, data)
-        .then(updated => {
-          setContacts(prev => prev.map(c => c.id === updated.id ? updated : c));
-          setEditingContact(null);
-        })
-        .catch(console.error);
-    } else {
-      createContact(data)
-        .then(created => setContacts(prev => [...prev, created]))
-        .catch(console.error);
-    }
+  const handleCreateContact = (data) => {
+    createContact(data)
+      .then(created => setContacts(prev => [...prev, created]))
+      .catch(console.error);
+  };
+
+  const handleUpdateContact = (id, data) => {
+    updateContact(id, data)
+      .then(updated => setContacts(prev => prev.map(c => c.id === updated.id ? updated : c)))
+      .catch(console.error);
+  };
+
+  const handlePasteContacts = (data) => {
+    createContact(data)
+      .then(created => setContacts(prev => [...prev, created]))
+      .catch(console.error);
   };
 
   const handleDeleteContact = (id) => {
@@ -54,19 +72,16 @@ function App() {
   };
 
   // --- Content handlers ---
-  const handleSaveContent = (data) => {
-    if (editingContent) {
-      updateContent(editingContent.id, data)
-        .then(updated => {
-          setContent(prev => prev.map(c => c.id === updated.id ? updated : c));
-          setEditingContent(null);
-        })
-        .catch(console.error);
-    } else {
-      createContent(data)
-        .then(created => setContent(prev => [...prev, created]))
-        .catch(console.error);
-    }
+  const handleCreateContent = (data) => {
+    createContent(data)
+      .then(created => setContent(prev => [...prev, created]))
+      .catch(console.error);
+  };
+
+  const handleUpdateContent = (id, data) => {
+    updateContent(id, data)
+      .then(updated => setContent(prev => prev.map(c => c.id === updated.id ? updated : c)))
+      .catch(console.error);
   };
 
   const handleDeleteContent = (id) => {
@@ -80,19 +95,21 @@ function App() {
   };
 
   // --- Activity handlers ---
-  const handleSaveActivity = (data) => {
-    if (editingActivity) {
-      updateActivity(editingActivity.id, data)
-        .then(updated => {
-          setActivities(prev => prev.map(a => a.id === updated.id ? updated : a));
-          setEditingActivity(null);
-        })
-        .catch(console.error);
-    } else {
-      createActivity(data)
-        .then(created => setActivities(prev => [...prev, created]))
-        .catch(console.error);
-    }
+  const handleCreateActivity = (data) => {
+    createActivity(data)
+      .then(created => setActivities(prev => [...prev, created]))
+      .catch(console.error);
+  };
+
+  const handleUpdateActivity = (id, data) => {
+    updateActivity(id, data)
+      .then(updated => setActivities(prev => prev.map(a => a.id === updated.id ? updated : a)))
+      .catch(console.error);
+  };
+
+  const handleNewActivityForContact = (contact) => {
+    setPrefillContactId(contact.id);
+    setTab('activities');
   };
 
   const handleDeleteActivity = (id) => {
@@ -103,39 +120,54 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>NameApp</h1>
-      </header>
-      <nav className="tab-nav">
-        <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
-        <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
-        <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
-      </nav>
-      <main>
-        {tab === 'contacts' && (
-          <>
-            <ContactForm editing={editingContact} onSave={handleSaveContact} onCancel={() => setEditingContact(null)} />
-            <hr />
-            <ContactTable contacts={contacts} onEdit={setEditingContact} onDelete={handleDeleteContact} />
-          </>
-        )}
-        {tab === 'activities' && (
-          <>
-            <ActivityForm editing={editingActivity} contacts={contacts} content={content} onSave={handleSaveActivity} onCancel={() => setEditingActivity(null)} />
-            <hr />
-            <ActivityTable activities={activities} contacts={contacts} onEdit={setEditingActivity} onDelete={handleDeleteActivity} />
-          </>
-        )}
-        {tab === 'content' && (
-          <>
-            <ContentForm editing={editingContent} onSave={handleSaveContent} onCancel={() => setEditingContent(null)} />
-            <hr />
-            <ContentTable content={content} onEdit={setEditingContent} onDelete={handleDeleteContent} />
-          </>
-        )}
-      </main>
-    </div>
+    <AgGridProvider modules={[AllCommunityModule]}>
+      <div className="App">
+        <header className="App-header">
+          <h1>NameApp</h1>
+        </header>
+        <nav className="tab-nav">
+          <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
+          <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
+          <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
+        </nav>
+        <main>
+          {tab === 'activities' && (
+            <ActivityTable
+              activities={activities}
+              contacts={contacts}
+              content={content}
+              onUpdateActivity={handleUpdateActivity}
+              onCreateActivity={handleCreateActivity}
+              onDelete={handleDeleteActivity}
+              prefillContactId={prefillContactId}
+              onClearPrefill={() => setPrefillContactId(null)}
+            />
+          )}
+          {tab === 'contacts' && (
+            <>
+              <ContactForm onSave={handleCreateContact} />
+              <hr />
+              <ContactTable
+                contacts={contacts}
+                onUpdateContact={handleUpdateContact}
+                onCreateContact={handleCreateContact}
+                onPasteRows={handlePasteContacts}
+                onDelete={handleDeleteContact}
+                onNewActivity={handleNewActivityForContact}
+              />
+            </>
+          )}
+          {tab === 'content' && (
+            <ContentTable
+              content={content}
+              onUpdateContent={handleUpdateContent}
+              onCreateContent={handleCreateContent}
+              onDelete={handleDeleteContent}
+            />
+          )}
+        </main>
+      </div>
+    </AgGridProvider>
   );
 }
 
