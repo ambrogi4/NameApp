@@ -17,19 +17,15 @@ export default function ContactForm({ onSave }) {
   };
 
   return (
-    <>
-      <div className="form-header">
-        <h2>Quick Add Contact</h2>
-      </div>
-      <form onSubmit={handleSubmit} className="grid-form">
-        <label>First *<input name="first" value={form.first} onChange={handleChange} required /></label>
-        <label>Last *<input name="last" value={form.last} onChange={handleChange} required /></label>
-        <label>Title<input name="title" value={form.title} onChange={handleChange} /></label>
-        <label>Firm<input name="firm" value={form.firm} onChange={handleChange} /></label>
-        <label>Email<input name="email" type="email" value={form.email} onChange={handleChange} /></label>
-        <label>LinkedIn URL<input name="li_url" type="url" value={form.li_url} onChange={handleChange} /></label>
-        <button type="submit">Add</button>
-      </form>
-    </>
+    <form onSubmit={handleSubmit} className="quick-add-row">
+      <span className="quick-add-label">Quick Add</span>
+      <input name="first" value={form.first} onChange={handleChange} placeholder="First *" required />
+      <input name="last" value={form.last} onChange={handleChange} placeholder="Last *" required />
+      <input name="title" value={form.title} onChange={handleChange} placeholder="Title" />
+      <input name="firm" value={form.firm} onChange={handleChange} placeholder="Firm" />
+      <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="Email" />
+      <input name="li_url" type="url" value={form.li_url} onChange={handleChange} placeholder="LinkedIn URL" />
+      <button type="submit">Add</button>
+    </form>
   );
 }

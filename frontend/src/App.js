@@ -131,7 +131,7 @@ function App() {
           <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
         </nav>
         <main>
-          {tab === 'activities' && (
+          <div style={{ display: tab === 'activities' ? 'block' : 'none' }}>
             <ActivityTable
               activities={activities}
               contacts={contacts}
@@ -142,29 +142,26 @@ function App() {
               prefillContactId={prefillContactId}
               onClearPrefill={() => setPrefillContactId(null)}
             />
-          )}
-          {tab === 'contacts' && (
-            <>
-              <ContactForm onSave={handleCreateContact} />
-              <hr />
-              <ContactTable
-                contacts={contacts}
-                onUpdateContact={handleUpdateContact}
-                onCreateContact={handleCreateContact}
-                onPasteRows={handlePasteContacts}
-                onDelete={handleDeleteContact}
-                onNewActivity={handleNewActivityForContact}
-              />
-            </>
-          )}
-          {tab === 'content' && (
+          </div>
+          <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
+            <ContactForm onSave={handleCreateContact} />
+            <ContactTable
+              contacts={contacts}
+              onUpdateContact={handleUpdateContact}
+              onCreateContact={handleCreateContact}
+              onPasteRows={handlePasteContacts}
+              onDelete={handleDeleteContact}
+              onNewActivity={handleNewActivityForContact}
+            />
+          </div>
+          <div style={{ display: tab === 'content' ? 'block' : 'none' }}>
             <ContentTable
               content={content}
               onUpdateContent={handleUpdateContent}
               onCreateContent={handleCreateContent}
               onDelete={handleDeleteContent}
             />
-          )}
+          </div>
         </main>
       </div>
     </AgGridProvider>

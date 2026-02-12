@@ -109,11 +109,51 @@
   color: #333;
 }
 
+/* Quick-add single-row form */
+.quick-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f9f9f9;
+  border-bottom: 1px solid #ddd;
+}
+
+.quick-add-row .quick-add-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+
+.quick-add-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.quick-add-row button[type="submit"] {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 /* AG Grid compact overrides */
 .ag-theme-balham {
   --ag-row-height: 25px;
   --ag-header-height: 28px;
   --ag-font-size: 13px;
+}
+
+/* Left-align all grid cell text */
+.ag-theme-balham .ag-header-cell-label {
+  justify-content: flex-start;
+}
+
+.ag-theme-balham .ag-cell {
+  text-align: left;
 }
 
 /* Button styling */

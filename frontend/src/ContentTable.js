@@ -8,6 +8,8 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
   const [newRow, setNewRow] = useState(createEmptyRow(CONTENT_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
@@ -42,13 +44,13 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
           );
         }
         return (
-          <button className="delete-btn" onClick={() => onDelete(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
+          <button className="delete-btn" onClick={() => onDeleteRef.current(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
             Delete
           </button>
         );
       },
     },
-  ], [onDelete]);
+  ], []);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -85,7 +87,6 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
         getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
-        singleClickEdit={true}
         stopEditingWhenCellsLoseFocus={true}
       />
     </div>

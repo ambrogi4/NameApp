@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
@@ -8,50 +8,81 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
   const [newRow, setNewRow] = useState(createEmptyRow(CONTACT_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
+  const onNewActivityRef = useRef(onNewActivity);
+  onNewActivityRef.current = onNewActivity;
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
-    { field: 'first', width: 100, editable: true },
-    { field: 'last', width: 100, editable: true },
-    { field: 'title', width: 120, editable: true },
-    { field: 'firm', width: 120, editable: true },
-    { field: 'source', width: 100, editable: true },
-    { field: 'education', width: 120, editable: true },
-    { field: 'email', width: 160, editable: true },
-    { field: 'phone', width: 120, editable: true },
-    { field: 'street', width: 140, editable: true },
-    { field: 'city', width: 100, editable: true },
-    { field: 'state', width: 70, editable: true },
-    { field: 'zip', width: 70, editable: true },
-    { field: 'country', width: 80, editable: true },
-    { field: 'li_url', headerName: 'LinkedIn', width: 160, editable: true },
-    { field: 'photo_url', headerName: 'Photo URL', width: 140, editable: true },
-    { field: 'tags', width: 120, editable: true },
-    { field: 'comment', width: 160, editable: true },
     {
-      field: 'in_crm',
-      headerName: 'CRM',
-      width: 60,
-      editable: true,
-      cellDataType: 'boolean',
+      headerName: 'Name',
+      children: [
+        { field: 'first', width: 100, editable: true },
+        { field: 'last', width: 100, editable: true },
+        { field: 'title', width: 120, editable: true, columnGroupShow: 'open' },
+        { field: 'firm', width: 120, editable: true, columnGroupShow: 'open' },
+      ],
     },
     {
-      field: 'index_1',
-      headerName: 'Idx 1',
-      width: 70,
-      editable: true,
-      filter: 'agNumberColumnFilter',
-      valueParser: (params) => params.newValue === '' || params.newValue == null ? null : Number(params.newValue),
+      headerName: 'Contact Info',
+      children: [
+        { field: 'email', width: 160, editable: true },
+        { field: 'phone', width: 120, editable: true, columnGroupShow: 'open' },
+        { field: 'li_url', headerName: 'LinkedIn', width: 160, editable: true, columnGroupShow: 'open' },
+      ],
     },
     {
-      field: 'index_2',
-      headerName: 'Idx 2',
-      width: 70,
-      editable: true,
-      filter: 'agNumberColumnFilter',
-      valueParser: (params) => params.newValue === '' || params.newValue == null ? null : Number(params.newValue),
+      headerName: 'Address',
+      children: [
+        { field: 'city', width: 100, editable: true },
+        { field: 'state', width: 70, editable: true },
+        { field: 'street', width: 140, editable: true, columnGroupShow: 'open' },
+        { field: 'zip', width: 70, editable: true, columnGroupShow: 'open' },
+        { field: 'country', width: 80, editable: true, columnGroupShow: 'open' },
+      ],
     },
-    { field: 'created_date', headerName: 'Created', width: 110, editable: false, filter: 'agDateColumnFilter' },
+    {
+      headerName: 'Details',
+      children: [
+        { field: 'source', width: 100, editable: true },
+        { field: 'tags', width: 120, editable: true },
+        { field: 'education', width: 120, editable: true, columnGroupShow: 'open' },
+        { field: 'comment', width: 160, editable: true, columnGroupShow: 'open' },
+        { field: 'photo_url', headerName: 'Photo URL', width: 140, editable: true, columnGroupShow: 'open' },
+      ],
+    },
+    {
+      headerName: 'Flags',
+      children: [
+        {
+          field: 'in_crm',
+          headerName: 'CRM',
+          width: 60,
+          editable: true,
+          cellDataType: 'boolean',
+        },
+        {
+          field: 'index_1',
+          headerName: 'Idx 1',
+          width: 70,
+          editable: true,
+          filter: 'agNumberColumnFilter',
+          columnGroupShow: 'open',
+          valueParser: (params) => params.newValue === '' || params.newValue == null ? null : Number(params.newValue),
+        },
+        {
+          field: 'index_2',
+          headerName: 'Idx 2',
+          width: 70,
+          editable: true,
+          filter: 'agNumberColumnFilter',
+          columnGroupShow: 'open',
+          valueParser: (params) => params.newValue === '' || params.newValue == null ? null : Number(params.newValue),
+        },
+        { field: 'created_date', headerName: 'Created', width: 110, editable: false, filter: 'agDateColumnFilter', columnGroupShow: 'open' },
+      ],
+    },
     {
       headerName: 'Actions',
       pinned: 'right',
@@ -69,17 +100,17 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
         }
         return (
           <>
-            <button className="delete-btn" onClick={() => onDelete(params.data.id)} style={{ fontSize: 11, padding: '2px 6px' }}>
+            <button className="delete-btn" onClick={() => onDeleteRef.current(params.data.id)} style={{ fontSize: 11, padding: '2px 6px' }}>
               Del
             </button>
-            <button className="activity-btn" onClick={() => onNewActivity(params.data)} style={{ fontSize: 11, padding: '2px 6px', marginLeft: 2 }}>
+            <button className="activity-btn" onClick={() => onNewActivityRef.current(params.data)} style={{ fontSize: 11, padding: '2px 6px', marginLeft: 2 }}>
               + Activity
             </button>
           </>
         );
       },
     },
-  ], [onDelete, onNewActivity]);
+  ], []);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -104,26 +135,47 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
     onUpdateContact(id, rest);
   }, [onUpdateContact]);
 
-  const processDataFromClipboard = useCallback((params) => {
-    const fields = ['first', 'last', 'title', 'firm', 'email', 'phone', 'city', 'state'];
-    const rows = params.data;
-    if (rows && rows.length > 0) {
+  const containerRef = useRef(null);
+  const onPasteRowsRef = useRef(onPasteRows);
+  onPasteRowsRef.current = onPasteRows;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handlePaste = (e) => {
+      // Skip if user is editing inside an input/textarea
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const text = e.clipboardData?.getData('text/plain');
+      if (!text) return;
+
+      const fields = ['first', 'last', 'title', 'firm', 'source', 'education',
+        'email', 'phone', 'street', 'city', 'state', 'zip', 'country',
+        'li_url', 'photo_url', 'tags', 'comment'];
+      const rows = text.split('\n').filter(line => line.trim() !== '');
+      if (rows.length === 0) return;
+
+      e.preventDefault();
       rows.forEach(row => {
+        const cols = row.split('\t');
         const obj = {};
-        row.forEach((val, i) => {
-          if (i < fields.length) obj[fields[i]] = val;
+        cols.forEach((val, i) => {
+          if (i < fields.length && val.trim() !== '') obj[fields[i]] = val.trim();
         });
-        onPasteRows(obj);
+        if (Object.keys(obj).length > 0) {
+          onPasteRowsRef.current(obj);
+        }
       });
-      return null; // prevent default paste
-    }
-    return params.data;
-  }, [onPasteRows]);
+    };
+    el.addEventListener('paste', handlePaste);
+    return () => el.removeEventListener('paste', handlePaste);
+  }, []);
 
   const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
 
   return (
-    <div className="ag-theme-balham" style={{ width: '100%', height: 500 }}>
+    <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 500 }} tabIndex={0}>
       <AgGridReact
         ref={gridRef}
         theme={themeBalham}
@@ -132,9 +184,7 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
         defaultColDef={defaultColDef}
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
-        processDataFromClipboard={processDataFromClipboard}
         getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
-        singleClickEdit={true}
         stopEditingWhenCellsLoseFocus={true}
       />
     </div>

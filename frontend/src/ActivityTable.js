@@ -9,6 +9,8 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
   const [newRow, setNewRow] = useState(createEmptyRow(ACTIVITY_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
 
   useEffect(() => {
     if (prefillContactId) {
@@ -103,13 +105,13 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
           );
         }
         return (
-          <button className="delete-btn" onClick={() => onDelete(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
+          <button className="delete-btn" onClick={() => onDeleteRef.current(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
             Delete
           </button>
         );
       },
     },
-  ], [contactName, contentName, contactOptions, contentOptions, onDelete]);
+  ], [contactName, contentName, contactOptions, contentOptions]);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -152,7 +154,6 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
         pinnedBottomRowData={pinnedBottomRowData}
         onCellValueChanged={onCellValueChanged}
         getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
-        singleClickEdit={true}
         stopEditingWhenCellsLoseFocus={true}
       />
     </div>
