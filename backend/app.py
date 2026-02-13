@@ -172,6 +172,45 @@ def create_contact():
     return jsonify(contact.to_dict()), 201
 
 
+@app.route('/api/contacts/batch', methods=['POST'])
+def create_contacts_batch():
+    data_list = request.get_json()
+    if not isinstance(data_list, list):
+        return jsonify({'error': 'Expected a JSON array'}), 400
+    created = []
+    try:
+        for data in data_list:
+            contact = Contact(
+                first=data.get('first', ''),
+                last=data.get('last', ''),
+                title=data.get('title'),
+                firm=data.get('firm'),
+                source=data.get('source'),
+                education=data.get('education'),
+                tags=data.get('tags'),
+                comment=data.get('comment'),
+                email=data.get('email'),
+                phone=data.get('phone'),
+                street=data.get('street'),
+                city=data.get('city'),
+                state=data.get('state'),
+                zip=data.get('zip'),
+                country=data.get('country'),
+                li_url=data.get('li_url'),
+                photo_url=data.get('photo_url'),
+                in_crm=data.get('in_crm', False),
+                index_1=data.get('index_1'),
+                index_2=data.get('index_2'),
+            )
+            db.session.add(contact)
+            created.append(contact)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+    return jsonify([c.to_dict() for c in created]), 201
+
+
 @app.route('/api/contacts/<int:contact_id>', methods=['PUT'])
 def update_contact(contact_id):
     contact = Contact.query.get_or_404(contact_id)

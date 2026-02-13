@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider } from 'ag-grid-react';
 import {
-  fetchContacts, createContact, updateContact, deleteContact,
+  fetchContacts, createContact, updateContact, deleteContact, createContactsBatch,
   fetchContent, createContent, updateContent, deleteContent,
   fetchActivities, createActivity, updateActivity, deleteActivity,
 } from './apiService';
@@ -10,6 +10,8 @@ import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
 import ContentTable from './ContentTable';
 import ActivityTable from './ActivityTable';
+import DupeReviewModal from './DupeReviewModal';
+import { findDuplicate, findDuplicates } from './dupeUtils';
 import './App.css';
 
 function App() {
@@ -19,6 +21,7 @@ function App() {
   const [content, setContent] = useState([]);
   const [activities, setActivities] = useState([]);
   const [prefillContactId, setPrefillContactId] = useState(null);
+  const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -44,6 +47,11 @@ function App() {
 
   // --- Contact handlers ---
   const handleCreateContact = (data) => {
+    const match = findDuplicate(data, contacts);
+    if (match) {
+      setDupeReviewQueue([{ incoming: data, existing: match.existing, matchType: match.matchType }]);
+      return;
+    }
     createContact(data)
       .then(created => setContacts(prev => [...prev, created]))
       .catch(console.error);
@@ -55,7 +63,26 @@ function App() {
       .catch(console.error);
   };
 
-  const handlePasteContacts = (data) => {
+  const handlePasteContacts = (dataArray) => {
+    const { newRows, dupes } = findDuplicates(dataArray, contacts);
+    if (newRows.length > 0) {
+      createContactsBatch(newRows)
+        .then(created => setContacts(prev => [...prev, ...created]))
+        .catch(console.error);
+    }
+    if (dupes.length > 0) {
+      setDupeReviewQueue(dupes);
+    }
+  };
+
+  const handleDupeMerge = (existingId, mergedFields) => {
+    if (Object.keys(mergedFields).length === 0) return;
+    updateContact(existingId, mergedFields)
+      .then(updated => setContacts(prev => prev.map(c => c.id === updated.id ? updated : c)))
+      .catch(console.error);
+  };
+
+  const handleDupeCreateAnyway = (data) => {
     createContact(data)
       .then(created => setContacts(prev => [...prev, created]))
       .catch(console.error);
@@ -67,6 +94,17 @@ function App() {
       .then(() => {
         setContacts(prev => prev.filter(c => c.id !== id));
         setActivities(prev => prev.filter(a => a.contact_id !== id));
+      })
+      .catch(console.error);
+  };
+
+  const handleDeleteContactsBatch = (ids) => {
+    if (!window.confirm(`Delete ${ids.length} contact(s) and all their activities?`)) return;
+    Promise.all(ids.map(id => deleteContact(id)))
+      .then(() => {
+        const idSet = new Set(ids);
+        setContacts(prev => prev.filter(c => !idSet.has(c.id)));
+        setActivities(prev => prev.filter(a => !idSet.has(a.contact_id)));
       })
       .catch(console.error);
   };
@@ -150,7 +188,7 @@ function App() {
               onUpdateContact={handleUpdateContact}
               onCreateContact={handleCreateContact}
               onPasteRows={handlePasteContacts}
-              onDelete={handleDeleteContact}
+              onDeleteBatch={handleDeleteContactsBatch}
               onNewActivity={handleNewActivityForContact}
             />
           </div>
@@ -163,6 +201,15 @@ function App() {
             />
           </div>
         </main>
+        {dupeReviewQueue.length > 0 && (
+          <DupeReviewModal
+            dupes={dupeReviewQueue}
+            onMerge={handleDupeMerge}
+            onSkip={() => {}}
+            onCreateAnyway={handleDupeCreateAnyway}
+            onClose={() => setDupeReviewQueue([])}
+          />
+        )}
       </div>
     </AgGridProvider>
   );

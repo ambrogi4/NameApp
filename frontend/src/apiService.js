@@ -37,6 +37,7 @@ export const fetchContacts = () => apiGet('/contacts');
 export const createContact = (data) => apiPost('/contacts', data);
 export const updateContact = (id, data) => apiPut(`/contacts/${id}`, data);
 export const deleteContact = (id) => apiDelete(`/contacts/${id}`);
+export const createContactsBatch = (dataArray) => apiPost('/contacts/batch', dataArray);
 
 // Content
 export const fetchContent = () => apiGet('/content');
