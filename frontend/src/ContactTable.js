@@ -220,6 +220,13 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        gridRef.current?.api?.deselectAll();
+        setSelectedRows([]);
+        return;
+      }
+
       if (e.key === 'Delete' && selectedRows.length > 0) {
         e.preventDefault();
         onDeleteBatchRef.current(selectedRows);

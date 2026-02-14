@@ -5,24 +5,27 @@
 /* Compact app bar */
 .app-bar {
   display: flex;
-  align-items: center;
-  background-color: #282c34;
-  padding: 0 12px;
+  align-items: stretch;
   height: 38px;
-  gap: 8px;
+  background: #fff;
 }
 
 .app-bar-title {
   font-weight: 700;
   font-size: 15px;
-  color: #fff;
-  margin-right: 8px;
+  color: #000;
   white-space: nowrap;
+  background: #87CEEB;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
 }
 
 .app-bar-tabs {
   display: flex;
   gap: 0;
+  background: #282c34;
+  padding-right: 12px;
 }
 
 .app-bar .tab {
@@ -53,21 +56,23 @@
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  padding: 0 12px;
+  background: #fff;
 }
 
 .app-bar-search {
   padding: 4px 8px;
-  border: 1px solid #555;
+  border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 12px;
-  background: #3a3f47;
-  color: #fff;
+  background: #fff;
+  color: #333;
   width: 150px;
   outline: none;
 }
 
 .app-bar-search::placeholder {
-  color: #888;
+  color: #999;
 }
 
 .app-bar-search:focus {
@@ -76,7 +81,7 @@
 
 .app-bar-count {
   font-size: 12px;
-  color: #999;
+  color: #777;
   white-space: nowrap;
 }
 

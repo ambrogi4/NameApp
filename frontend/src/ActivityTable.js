@@ -12,11 +12,62 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
   const onDeleteRef = useRef(onDelete);
   onDeleteRef.current = onDelete;
 
+  const containerRef = useRef(null);
+
+  const focusPinnedContact = useCallback(() => {
+    setTimeout(() => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      const pinnedRowCount = api.getPinnedBottomRowCount();
+      if (pinnedRowCount > 0) {
+        api.setFocusedCell(0, 'contact_id', 'bottom');
+      }
+    }, 100);
+  }, []);
+
   useEffect(() => {
     if (prefillContactId) {
       setNewRow(prev => ({ ...prev, contact_id: prefillContactId }));
+      focusPinnedContact();
     }
-  }, [prefillContactId]);
+  }, [prefillContactId, focusPinnedContact]);
+
+  // Keyboard shortcuts: Ctrl+Enter to save, Alt+A to copy contact from focused row
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleKeyDown = (e) => {
+      // Ctrl+Enter: save new row
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        const row = newRowRef.current;
+        if (row.contact_id) {
+          handleSaveNewRef.current();
+        }
+        return;
+      }
+
+      // Alt+A: copy contact_id from focused row into new row
+      if (e.altKey && e.key === 'a') {
+        e.preventDefault();
+        const api = gridRef.current?.api;
+        if (!api) return;
+        const cell = api.getFocusedCell();
+        if (cell && cell.rowPinned !== 'bottom') {
+          const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode?.data?.contact_id) {
+            setNewRow(prev => ({ ...prev, contact_id: rowNode.data.contact_id }));
+            focusPinnedContact();
+          }
+        }
+        return;
+      }
+    };
+    el.addEventListener('keydown', handleKeyDown);
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, [focusPinnedContact]);
+
+  const handleSaveNewRef = useRef(null);
 
   const contactOptions = useMemo(() =>
     contacts.map(c => ({ value: c.id, label: `${c.first} ${c.last}` })),
@@ -28,15 +79,22 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
     [content]
   );
 
-  const contactName = useCallback((id) => {
+  const contactNameRef = useRef((id) => '');
+  contactNameRef.current = (id) => {
     const c = contacts.find(c => c.id === id);
     return c ? `${c.first} ${c.last}` : id ? `#${id}` : '';
-  }, [contacts]);
+  };
 
-  const contentName = useCallback((id) => {
+  const contentNameRef = useRef((id) => '');
+  contentNameRef.current = (id) => {
     const c = content.find(c => c.id === id);
     return c ? (c.short_name || c.title || `#${c.id}`) : '';
-  }, [content]);
+  };
+
+  const contactOptionsRef = useRef(contactOptions);
+  contactOptionsRef.current = contactOptions;
+  const contentOptionsRef = useRef(contentOptions);
+  contentOptionsRef.current = contentOptions;
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
@@ -45,18 +103,18 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
       headerName: 'Contact',
       width: 150,
       editable: true,
-      valueFormatter: (params) => contactName(params.value),
+      valueFormatter: (params) => contactNameRef.current(params.value),
       cellEditor: SelectCellEditor,
-      cellEditorParams: { options: contactOptions, numeric: true, allowNull: false },
+      cellEditorParams: () => ({ options: contactOptionsRef.current, numeric: true, allowNull: false }),
     },
     {
       field: 'content_id',
       headerName: 'Content',
       width: 140,
       editable: true,
-      valueFormatter: (params) => contentName(params.value),
+      valueFormatter: (params) => contentNameRef.current(params.value),
       cellEditor: SelectCellEditor,
-      cellEditorParams: { options: contentOptions, numeric: true, allowNull: true },
+      cellEditorParams: () => ({ options: contentOptionsRef.current, numeric: true, allowNull: true }),
     },
     {
       field: 'channel',
@@ -111,7 +169,7 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
         );
       },
     },
-  ], [contactName, contentName, contactOptions, contentOptions]);
+  ], []);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -131,6 +189,7 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
     setNewRow(createEmptyRow(ACTIVITY_FIELDS));
     if (onClearPrefill) onClearPrefill();
   }, [onCreateActivity, onClearPrefill]);
+  handleSaveNewRef.current = handleSaveNew;
 
   const onCellValueChanged = useCallback((params) => {
     if (isPinnedRow(params)) {
@@ -160,7 +219,7 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
   }, []);
 
   return (
-    <div className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }}>
+    <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }} tabIndex={0}>
       <AgGridReact
         ref={gridRef}
         theme={themeBalham}
