@@ -2,8 +2,9 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import TagModal from './TagModal';
 
-export default function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity }) {
+export default function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, quickFilterText }) {
   const gridRef = useRef(null);
   const [newRow, setNewRow] = useState(createEmptyRow(CONTACT_FIELDS));
   const newRowRef = useRef(newRow);
@@ -14,7 +15,56 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
   onNewActivityRef.current = onNewActivity;
 
   const [selectedRows, setSelectedRows] = useState([]);
-  const [quickFilterText, setQuickFilterText] = useState('');
+  const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
+
+  const parseTags = (s) => (s || '').split(',').map(t => t.trim()).filter(Boolean);
+  const joinTags = (arr) => arr.join(', ');
+
+  const selectedContacts = useMemo(() => {
+    const idSet = new Set(selectedRows);
+    return contacts.filter(c => idSet.has(c.id));
+  }, [selectedRows, contacts]);
+
+  const anySelectedHaveTags = useMemo(
+    () => selectedContacts.some(c => parseTags(c.tags).length > 0),
+    [selectedContacts]
+  );
+
+  const handleAddTags = useCallback((input) => {
+    const newTags = parseTags(input);
+    if (newTags.length === 0) return;
+    selectedContacts.forEach(c => {
+      const existing = parseTags(c.tags);
+      const merged = [...existing, ...newTags.filter(t => !existing.includes(t))];
+      const { id, ...rest } = c;
+      onUpdateContact(id, { ...rest, tags: joinTags(merged) });
+    });
+    setTagModal(null);
+  }, [selectedContacts, onUpdateContact]);
+
+  const handleDeleteTag = useCallback((input) => {
+    const tagToRemove = input.trim();
+    if (!tagToRemove) return;
+    selectedContacts.forEach(c => {
+      const existing = parseTags(c.tags);
+      const filtered = existing.filter(t => t !== tagToRemove);
+      if (filtered.length !== existing.length) {
+        const { id, ...rest } = c;
+        onUpdateContact(id, { ...rest, tags: joinTags(filtered) });
+      }
+    });
+    setTagModal(null);
+  }, [selectedContacts, onUpdateContact]);
+
+  const handleClearAllTags = useCallback(() => {
+    if (!window.confirm(`Clear all tags from ${selectedContacts.length} contact(s)?`)) return;
+    selectedContacts.forEach(c => {
+      if (parseTags(c.tags).length > 0) {
+        const { id, ...rest } = c;
+        onUpdateContact(id, { ...rest, tags: '' });
+      }
+    });
+  }, [selectedContacts, onUpdateContact]);
 
   const columnDefs = useMemo(() => [
     {
@@ -229,33 +279,43 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
 
   return (
     <div>
-      <div className="contact-toolbar">
-        <input
-          type="text"
-          placeholder="Search contacts..."
-          value={quickFilterText}
-          onChange={(e) => setQuickFilterText(e.target.value)}
-        />
-        {newRowHasData && (
-          <button onClick={handleSaveNew} style={{ backgroundColor: '#4CAF50', color: 'white' }}>
-            Save New
-          </button>
-        )}
-        {selectedRows.length > 0 && (
-          <button
-            className="delete-btn"
-            onClick={() => {
-              onDeleteBatchRef.current(selectedRows);
-              setSelectedRows([]);
-              gridRef.current?.api?.deselectAll();
-            }}
-          >
-            Delete Selected ({selectedRows.length})
-          </button>
-        )}
-        <span className="contact-count">{contacts.length} contacts</span>
-      </div>
-      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 500 }} tabIndex={0}>
+      {(newRowHasData || selectedRows.length > 0) && (
+        <div className="contact-toolbar">
+          {newRowHasData && (
+            <button onClick={handleSaveNew} style={{ backgroundColor: '#4CAF50', color: 'white' }}>
+              Save New
+            </button>
+          )}
+          {selectedRows.length >= 2 && (
+            <button className="edit-btn" onClick={() => setTagModal('add')}>
+              Add Tags
+            </button>
+          )}
+          {selectedRows.length >= 2 && anySelectedHaveTags && (
+            <>
+              <button className="activity-btn" onClick={() => setTagModal('delete')}>
+                Delete Tag
+              </button>
+              <button className="delete-btn" onClick={handleClearAllTags}>
+                Clear All Tags
+              </button>
+            </>
+          )}
+          {selectedRows.length > 0 && (
+            <button
+              className="delete-btn"
+              onClick={() => {
+                onDeleteBatchRef.current(selectedRows);
+                setSelectedRows([]);
+                gridRef.current?.api?.deselectAll();
+              }}
+            >
+              Delete Selected ({selectedRows.length})
+            </button>
+          )}
+        </div>
+      )}
+      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 118px)' }} tabIndex={0}>
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}
@@ -281,6 +341,22 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
           onSelectionChanged={onSelectionChanged}
         />
       </div>
+      {tagModal === 'add' && (
+        <TagModal
+          title={`Add tags to ${selectedRows.length} contacts`}
+          placeholder="Tag1, Tag2, ..."
+          onConfirm={handleAddTags}
+          onClose={() => setTagModal(null)}
+        />
+      )}
+      {tagModal === 'delete' && (
+        <TagModal
+          title={`Remove tag from ${selectedRows.length} contacts`}
+          placeholder="Tag to remove"
+          onConfirm={handleDeleteTag}
+          onClose={() => setTagModal(null)}
+        />
+      )}
     </div>
   );
 }

@@ -93,7 +93,7 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
   }, []);
 
   return (
-    <div className="ag-theme-balham" style={{ width: '100%', height: 500 }}>
+    <div className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }}>
       <AgGridReact
         ref={gridRef}
         theme={themeBalham}

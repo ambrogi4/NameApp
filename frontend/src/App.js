@@ -22,6 +22,7 @@ function App() {
   const [activities, setActivities] = useState([]);
   const [prefillContactId, setPrefillContactId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
+  const [quickFilterText, setQuickFilterText] = useState('');
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -160,14 +161,26 @@ function App() {
   return (
     <AgGridProvider modules={[AllCommunityModule]}>
       <div className="App">
-        <header className="App-header">
-          <h1>NameApp</h1>
-        </header>
-        <nav className="tab-nav">
-          <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
-          <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
-          <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
-        </nav>
+        <div className="app-bar">
+          <span className="app-bar-title">myCRM</span>
+          <div className="app-bar-tabs">
+            <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
+            <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
+            <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
+          </div>
+          {tab === 'contacts' && (
+            <div className="app-bar-right">
+              <input
+                type="text"
+                className="app-bar-search"
+                placeholder="Search..."
+                value={quickFilterText}
+                onChange={(e) => setQuickFilterText(e.target.value)}
+              />
+              <span className="app-bar-count">{contacts.length}</span>
+            </div>
+          )}
+        </div>
         <main>
           <div style={{ display: tab === 'activities' ? 'block' : 'none' }}>
             <ActivityTable
@@ -190,6 +203,7 @@ function App() {
               onPasteRows={handlePasteContacts}
               onDeleteBatch={handleDeleteContactsBatch}
               onNewActivity={handleNewActivityForContact}
+              quickFilterText={quickFilterText}
             />
           </div>
           <div style={{ display: tab === 'content' ? 'block' : 'none' }}>
