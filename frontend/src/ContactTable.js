@@ -1,11 +1,19 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import TagModal from './TagModal';
 
-export default function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, quickFilterText }) {
+const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, quickFilterText, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    clearFilters: () => {
+      const api = gridRef.current?.api;
+      if (api) api.setFilterModel(null);
+    },
+  }));
+
   const [newRow, setNewRow] = useState(createEmptyRow(CONTACT_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
@@ -13,6 +21,8 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
   onDeleteBatchRef.current = onDeleteBatch;
   const onNewActivityRef = useRef(onNewActivity);
   onNewActivityRef.current = onNewActivity;
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -175,8 +185,9 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
   const onPasteRowsRef = useRef(onPasteRows);
   onPasteRowsRef.current = onPasteRows;
 
-  // Paste handler — batch mode
+  // Paste handler — batch mode (disabled in lookup mode)
   useEffect(() => {
+    if (lookupMode) return;
     const el = containerRef.current;
     if (!el) return;
     const handlePaste = (e) => {
@@ -210,7 +221,7 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
     };
     el.addEventListener('paste', handlePaste);
     return () => el.removeEventListener('paste', handlePaste);
-  }, []);
+  }, [lookupMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -240,6 +251,7 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
         if (cell) {
           const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
           if (rowNode && !rowNode.rowPinned) {
+            if (onDismissRef.current) onDismissRef.current();
             onNewActivityRef.current(rowNode.data);
           }
         }
@@ -258,12 +270,12 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
     setSelectedRows(ids);
   }, []);
 
-  const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
+  const pinnedBottomRowData = useMemo(() => lookupMode ? undefined : [newRow], [newRow, lookupMode]);
 
-  const newRowHasData = newRow.first || newRow.last;
+  const newRowHasData = !lookupMode && (newRow.first || newRow.last);
 
-  const GROUP_KEY = 'contactTable_columnGroupState';
-  const COL_KEY = 'contactTable_columnState';
+  const GROUP_KEY = lookupMode ? 'lookupTable_columnGroupState' : 'contactTable_columnGroupState';
+  const COL_KEY = lookupMode ? 'lookupTable_columnState' : 'contactTable_columnState';
 
   const onGridReady = useCallback((params) => {
     const savedGroup = localStorage.getItem(GROUP_KEY);
@@ -286,7 +298,7 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
 
   return (
     <div>
-      {(newRowHasData || selectedRows.length > 0) && (
+      {!lookupMode && (newRowHasData || selectedRows.length > 0) && (
         <div className="contact-toolbar">
           {newRowHasData && (
             <button onClick={handleSaveNew} style={{ backgroundColor: '#4CAF50', color: 'white' }}>
@@ -366,4 +378,6 @@ export default function ContactTable({ contacts, onUpdateContact, onCreateContac
       )}
     </div>
   );
-}
+});
+
+export default ContactTable;

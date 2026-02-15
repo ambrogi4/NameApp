@@ -85,6 +85,93 @@
   white-space: nowrap;
 }
 
+.clear-filters-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  background: #e0e0e0;
+  color: #333;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.clear-filters-btn:hover {
+  background: #d0d0d0;
+}
+
+/* Global Lookup Overlay */
+.lookup-overlay {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+}
+
+.lookup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #282c34;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.lookup-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #64b5f6;
+  white-space: nowrap;
+}
+
+.lookup-search {
+  padding: 4px 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #3a3f47;
+  color: #fff;
+  width: 200px;
+  outline: none;
+}
+
+.lookup-search::placeholder {
+  color: #999;
+}
+
+.lookup-search:focus {
+  border-color: #64b5f6;
+}
+
+.lookup-hint {
+  font-size: 11px;
+  color: #888;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.lookup-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 0;
+}
+
+.lookup-close:hover {
+  color: #fff;
+}
+
+.lookup-grid-container {
+  flex: 1;
+  overflow: hidden;
+}
+
 /* Two-column grid form */
 .grid-form {
   display: grid;
@@ -415,4 +502,147 @@ button[type="submit"]:hover {
 
 .dupe-create-btn:hover {
   background: #F57C00;
+}
+
+/* Fancy Filter */
+.fancy-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fancy-filter-select {
+  padding: 4px 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #3a3f47;
+  color: #fff;
+  max-width: 300px;
+  outline: none;
+}
+
+.fancy-filter-select:focus {
+  border-color: #64b5f6;
+}
+
+.fancy-filter-param {
+  flex-shrink: 0;
+}
+
+.fancy-filter-date {
+  padding: 4px 6px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #3a3f47;
+  color: #fff;
+  outline: none;
+}
+
+.fancy-filter-date:focus {
+  border-color: #64b5f6;
+}
+
+.fancy-filter-run {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fancy-filter-run:disabled {
+  background: #555;
+  color: #999;
+  cursor: default;
+}
+
+.fancy-filter-run:not(:disabled):hover {
+  background: #45a049;
+}
+
+.fancy-filter-count {
+  font-size: 12px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+/* TypeAhead */
+.typeahead-container {
+  position: relative;
+  display: inline-block;
+}
+
+.typeahead-input {
+  padding: 4px 22px 4px 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #3a3f47;
+  color: #fff;
+  width: 150px;
+  outline: none;
+}
+
+.typeahead-input::placeholder {
+  color: #999;
+}
+
+.typeahead-input:focus {
+  border-color: #64b5f6;
+}
+
+.typeahead-clear {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 0;
+  line-height: 1;
+}
+
+.typeahead-clear:hover {
+  color: #fff;
+}
+
+.typeahead-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #2c3038;
+  border: 1px solid #555;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 1000;
+}
+
+.typeahead-item {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #ddd;
+  cursor: pointer;
+}
+
+.typeahead-highlighted {
+  background: #3d6baa;
+  color: #fff;
 }

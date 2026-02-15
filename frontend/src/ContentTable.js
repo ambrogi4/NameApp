@@ -1,10 +1,17 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 
-export default function ContentTable({ content, onUpdateContent, onCreateContent, onDelete }) {
+const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDelete }, ref) {
   const gridRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    clearFilters: () => {
+      const api = gridRef.current?.api;
+      if (api) api.setFilterModel(null);
+    },
+  }));
   const [newRow, setNewRow] = useState(createEmptyRow(CONTENT_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
@@ -112,4 +119,6 @@ export default function ContentTable({ content, onUpdateContent, onCreateContent
       />
     </div>
   );
-}
+});
+
+export default ContentTable;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider } from 'ag-grid-react';
 import {
@@ -11,6 +11,7 @@ import ContactTable from './ContactTable';
 import ContentTable from './ContentTable';
 import ActivityTable from './ActivityTable';
 import DupeReviewModal from './DupeReviewModal';
+import FancyFilterPanel from './FancyFilterPanel';
 import { findDuplicate, findDuplicates } from './dupeUtils';
 import './App.css';
 
@@ -23,9 +24,40 @@ function App() {
   const [prefillContactId, setPrefillContactId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
   const [quickFilterText, setQuickFilterText] = useState('');
+  const [showLookup, setShowLookup] = useState(false);
+  const [lookupSearch, setLookupSearch] = useState('');
+  const [showFancyFilter, setShowFancyFilter] = useState(false);
+  const [fancyFilterResults, setFancyFilterResults] = useState(null);
+  const [fancyFilterResultTable, setFancyFilterResultTable] = useState(null);
+
+  const contactTableRef = useRef(null);
+  const activityTableRef = useRef(null);
+  const contentTableRef = useRef(null);
+
+  const handleClearAllFilters = useCallback(() => {
+    setQuickFilterText('');
+    if (tab === 'contacts') contactTableRef.current?.clearFilters();
+    else if (tab === 'activities') activityTableRef.current?.clearFilters();
+    else if (tab === 'content') contentTableRef.current?.clearFilters();
+  }, [tab]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Alt+G: open global lookup
+      if (e.altKey && e.key === 'g') {
+        e.preventDefault();
+        setShowLookup(true);
+        setLookupSearch('');
+        return;
+      }
+      // Alt+F: open fancy filter
+      if (e.altKey && e.key === 'f') {
+        e.preventDefault();
+        setShowFancyFilter(true);
+        setFancyFilterResults(null);
+        setFancyFilterResultTable(null);
+        return;
+      }
       if (!e.altKey) return;
       const idx = TAB_ORDER.indexOf(tab);
       if (e.key === 'ArrowUp' && idx > 0) {
@@ -151,6 +183,24 @@ function App() {
     setTab('activities');
   };
 
+  const handleCloseLookup = useCallback(() => {
+    setShowLookup(false);
+    setLookupSearch('');
+  }, []);
+
+  const handleCloseFancyFilter = useCallback(() => {
+    setShowFancyFilter(false);
+    setFancyFilterResults(null);
+    setFancyFilterResultTable(null);
+  }, []);
+
+  const handleRunFancyFilter = useCallback((template, params) => {
+    const data = { contacts, activities, content };
+    const results = template.execute(data, params);
+    setFancyFilterResults(results);
+    setFancyFilterResultTable(template.resultTable);
+  }, [contacts, activities, content]);
+
   const handleDeleteActivity = (id) => {
     if (!window.confirm('Delete this activity?')) return;
     deleteActivity(id)
@@ -168,8 +218,8 @@ function App() {
             <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
             <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
           </div>
-          {tab === 'contacts' && (
-            <div className="app-bar-right">
+          <div className="app-bar-right">
+            {tab === 'contacts' && (
               <input
                 type="text"
                 className="app-bar-search"
@@ -177,13 +227,19 @@ function App() {
                 value={quickFilterText}
                 onChange={(e) => setQuickFilterText(e.target.value)}
               />
+            )}
+            <button className="clear-filters-btn" onClick={handleClearAllFilters} title="Clear all filters and search">
+              Clear Filters
+            </button>
+            {tab === 'contacts' && (
               <span className="app-bar-count">{contacts.length}</span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <main>
           <div style={{ display: tab === 'activities' ? 'block' : 'none' }}>
             <ActivityTable
+              ref={activityTableRef}
               activities={activities}
               contacts={contacts}
               content={content}
@@ -197,6 +253,7 @@ function App() {
           <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
             <ContactForm onSave={handleCreateContact} />
             <ContactTable
+              ref={contactTableRef}
               contacts={contacts}
               onUpdateContact={handleUpdateContact}
               onCreateContact={handleCreateContact}
@@ -208,6 +265,7 @@ function App() {
           </div>
           <div style={{ display: tab === 'content' ? 'block' : 'none' }}>
             <ContentTable
+              ref={contentTableRef}
               content={content}
               onUpdateContent={handleUpdateContent}
               onCreateContent={handleCreateContent}
@@ -215,6 +273,72 @@ function App() {
             />
           </div>
         </main>
+        {showLookup && (
+          <div className="lookup-overlay" onKeyDown={(e) => { if (e.key === 'Escape' && !e.altKey) { e.stopPropagation(); handleCloseLookup(); } }}>
+            <div className="lookup-header">
+              <span className="lookup-title">Global Lookup</span>
+              <input
+                type="text"
+                className="lookup-search"
+                placeholder="Search contacts..."
+                value={lookupSearch}
+                onChange={(e) => setLookupSearch(e.target.value)}
+                autoFocus
+              />
+              <span className="lookup-hint">Alt+G to open | Esc to close</span>
+              <button className="lookup-close" onClick={handleCloseLookup}>&times;</button>
+            </div>
+            <div className="lookup-grid-container">
+              <ContactTable
+                contacts={contacts}
+                onUpdateContact={handleUpdateContact}
+                onNewActivity={handleNewActivityForContact}
+                quickFilterText={lookupSearch}
+                lookupMode
+                onDismiss={handleCloseLookup}
+              />
+            </div>
+          </div>
+        )}
+        {showFancyFilter && (
+          <div className="lookup-overlay" onKeyDown={(e) => { if (e.key === 'Escape' && !e.altKey) { e.stopPropagation(); handleCloseFancyFilter(); } }}>
+            <div className="lookup-header">
+              <span className="lookup-title">Fancy Filter</span>
+              <FancyFilterPanel
+                contacts={contacts}
+                content={content}
+                onRun={handleRunFancyFilter}
+                resultCount={fancyFilterResults ? fancyFilterResults.length : null}
+              />
+              <span className="lookup-hint">Alt+F to open | Esc to close</span>
+              <button className="lookup-close" onClick={handleCloseFancyFilter}>&times;</button>
+            </div>
+            <div className="lookup-grid-container">
+              {fancyFilterResults && fancyFilterResultTable === 'contacts' && (
+                <ContactTable
+                  contacts={fancyFilterResults}
+                  onUpdateContact={handleUpdateContact}
+                  onNewActivity={handleNewActivityForContact}
+                  quickFilterText=""
+                  lookupMode
+                  onDismiss={handleCloseFancyFilter}
+                />
+              )}
+              {fancyFilterResults && fancyFilterResultTable === 'activities' && (
+                <ActivityTable
+                  activities={fancyFilterResults}
+                  contacts={contacts}
+                  content={content}
+                  onUpdateActivity={handleUpdateActivity}
+                  onCreateActivity={handleCreateActivity}
+                  onDelete={handleDeleteActivity}
+                  lookupMode
+                  onDismiss={handleCloseFancyFilter}
+                />
+              )}
+            </div>
+          </div>
+        )}
         {dupeReviewQueue.length > 0 && (
           <DupeReviewModal
             dupes={dupeReviewQueue}

@@ -1,11 +1,18 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import SelectCellEditor from './SelectCellEditor';
 
-export default function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, onClearPrefill }) {
+const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, onClearPrefill, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    clearFilters: () => {
+      const api = gridRef.current?.api;
+      if (api) api.setFilterModel(null);
+    },
+  }));
   const [newRow, setNewRow] = useState(createEmptyRow(ACTIVITY_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
@@ -44,6 +51,13 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
         if (row.contact_id) {
           handleSaveNewRef.current();
         }
+        return;
+      }
+
+      // Alt+Enter: jump to pinned new row
+      if (e.altKey && e.key === 'Enter') {
+        e.preventDefault();
+        focusPinnedContact();
         return;
       }
 
@@ -200,23 +214,25 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
     onUpdateActivity(id, rest);
   }, [onUpdateActivity]);
 
-  const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
+  const pinnedBottomRowData = useMemo(() => lookupMode ? undefined : [newRow], [newRow, lookupMode]);
 
   const STORAGE_KEY = 'activityTable_columnState';
 
   const onGridReady = useCallback((params) => {
+    if (lookupMode) return;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         params.api.applyColumnState({ state: JSON.parse(saved), applyOrder: true });
       } catch (e) { /* ignore bad data */ }
     }
-  }, []);
+  }, [lookupMode]);
 
   const saveColumnState = useCallback((params) => {
+    if (lookupMode) return;
     const state = params.api.getColumnState();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, []);
+  }, [lookupMode]);
 
   return (
     <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }} tabIndex={0}>
@@ -238,4 +254,6 @@ export default function ActivityTable({ activities, contacts, content, onUpdateA
       />
     </div>
   );
-}
+});
+
+export default ActivityTable;
