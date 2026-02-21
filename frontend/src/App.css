@@ -646,3 +646,254 @@ button[type="submit"]:hover {
   background: #3d6baa;
   color: #fff;
 }
+
+/* Reports Page */
+.reports-page {
+  text-align: left;
+  padding: 12px 16px;
+  max-width: 1200px;
+}
+
+.reports-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 16px;
+}
+
+.reports-select {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #333;
+}
+
+.reports-run-btn {
+  padding: 5px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reports-run-btn:hover {
+  background: #45a049;
+}
+
+.reports-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.report-section h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 8px 0;
+  border-bottom: 2px solid #64b5f6;
+  padding-bottom: 4px;
+}
+
+.report-firm-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin: 8px 0 4px 0;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: 'Courier New', Courier, monospace;
+  margin-bottom: 8px;
+}
+
+.report-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 2px solid #ccc;
+  font-weight: 600;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  white-space: nowrap;
+}
+
+.report-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.report-table tbody tr:hover {
+  background: #f5f9ff;
+}
+
+.report-comment-cell {
+  white-space: pre-wrap;
+  max-width: 400px;
+}
+
+.report-empty {
+  color: #999;
+  font-style: italic;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+/* Filter Page (light theme) */
+.filter-page {
+  text-align: left;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 42px);
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.filter-select {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #333;
+  max-width: 300px;
+  outline: none;
+}
+
+.filter-select:focus {
+  border-color: #64b5f6;
+}
+
+.filter-date {
+  padding: 5px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #333;
+  outline: none;
+}
+
+.filter-date:focus {
+  border-color: #64b5f6;
+}
+
+.filter-run {
+  padding: 5px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-run:disabled {
+  background: #ccc;
+  color: #999;
+  cursor: default;
+}
+
+.filter-run:not(:disabled):hover {
+  background: #45a049;
+}
+
+.filter-count {
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.filter-grid-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* TypeAhead Light Mode */
+.typeahead-input-light {
+  padding: 5px 22px 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #333;
+  width: 150px;
+  outline: none;
+}
+
+.typeahead-input-light::placeholder {
+  color: #999;
+}
+
+.typeahead-input-light:focus {
+  border-color: #64b5f6;
+}
+
+.typeahead-clear-light {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 0;
+  line-height: 1;
+}
+
+.typeahead-clear-light:hover {
+  color: #333;
+}
+
+.typeahead-list-light {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 1000;
+}
+
+.typeahead-item-light {
+  padding: 4px 8px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.typeahead-highlighted-light {
+  background: #e3f2fd;
+  color: #1565c0;
+}

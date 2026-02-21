@@ -245,12 +245,51 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
         gridRef.current?.api?.deselectAll();
       }
 
+      // Alt+U: open URL in focused cell
+      if (e.altKey && e.key === 'u') {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          const cell = api.getFocusedCell();
+          if (cell && !cell.rowPinned) {
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode) {
+              const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+              const val = rowNode.data[colId];
+              if (typeof val === 'string' && val.trim()) {
+                let url = val.trim();
+                if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+                window.open(url, '_blank');
+              }
+            }
+          }
+        }
+        return;
+      }
+
+      // Alt+L: Google search for contact's LinkedIn profile
+      if (e.altKey && e.key === 'l') {
+        e.preventDefault();
+        const cell = gridRef.current?.api?.getFocusedCell();
+        if (cell) {
+          const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode && !rowNode.rowPinned) {
+            const d = rowNode.data;
+            const terms = [d.first, d.last, d.title, d.firm, 'linkedin'].filter(Boolean);
+            const query = encodeURIComponent(terms.join(' '));
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+          }
+        }
+      }
+
       if (e.altKey && e.key === 'a') {
         e.preventDefault();
         const cell = gridRef.current?.api?.getFocusedCell();
         if (cell) {
           const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
           if (rowNode && !rowNode.rowPinned) {
+            e.stopPropagation();
             if (onDismissRef.current) onDismissRef.current();
             onNewActivityRef.current(rowNode.data);
           }

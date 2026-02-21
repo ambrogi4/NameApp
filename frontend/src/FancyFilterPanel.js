@@ -2,15 +2,25 @@ import React, { useState, useMemo, useCallback } from 'react';
 import templates from './fancyFilterTemplates';
 import TypeAheadInput from './TypeAheadInput';
 
-function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
+function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) {
   const [templateId, setTemplateId] = useState('');
   const [params, setParams] = useState({});
 
   const template = templates.find(t => t.id === templateId);
 
   const handleTemplateChange = useCallback((e) => {
-    setTemplateId(e.target.value);
-    setParams({});
+    const id = e.target.value;
+    setTemplateId(id);
+    const tmpl = templates.find(t => t.id === id);
+    const defaults = {};
+    if (tmpl) {
+      tmpl.params.forEach(p => {
+        if (p.defaultValue) {
+          defaults[p.key] = typeof p.defaultValue === 'function' ? p.defaultValue() : p.defaultValue;
+        }
+      });
+    }
+    setParams(defaults);
   }, []);
 
   const setParam = useCallback((key, value) => {
@@ -64,10 +74,16 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
     }
   };
 
+  const selectClass = lightMode ? 'filter-select' : 'fancy-filter-select';
+  const dateClass = lightMode ? 'filter-date' : 'fancy-filter-date';
+  const runClass = lightMode ? 'filter-run' : 'fancy-filter-run';
+  const countClass = lightMode ? 'filter-count' : 'fancy-filter-count';
+  const controlsClass = lightMode ? 'filter-controls' : 'fancy-filter-controls';
+
   return (
-    <div className="fancy-filter-controls">
+    <div className={controlsClass}>
       <select
-        className="fancy-filter-select"
+        className={selectClass}
         value={templateId}
         onChange={handleTemplateChange}
       >
@@ -82,7 +98,7 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
           {p.type === 'date' ? (
             <input
               type="date"
-              className="fancy-filter-date"
+              className={dateClass}
               value={params[p.key] || ''}
               onChange={(e) => setParam(p.key, e.target.value)}
               title={p.label}
@@ -93,6 +109,7 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
               value={params[p.key] || ''}
               onChange={(val) => setParam(p.key, val)}
               placeholder={p.label}
+              lightMode={lightMode}
             />
           )}
         </div>
@@ -100,7 +117,7 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
 
       {template && (
         <button
-          className="fancy-filter-run"
+          className={runClass}
           onClick={handleRun}
           disabled={!allRequiredFilled}
         >
@@ -109,7 +126,7 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount }) {
       )}
 
       {resultCount !== null && (
-        <span className="fancy-filter-count">{resultCount} result{resultCount !== 1 ? 's' : ''}</span>
+        <span className={countClass}>{resultCount} result{resultCount !== 1 ? 's' : ''}</span>
       )}
     </div>
   );

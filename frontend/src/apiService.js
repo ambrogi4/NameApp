@@ -44,6 +44,16 @@ export const fetchContent = () => apiGet('/content');
 export const createContent = (data) => apiPost('/content', data);
 export const updateContent = (id, data) => apiPut(`/content/${id}`, data);
 export const deleteContent = (id) => apiDelete(`/content/${id}`);
+export const fetchUrlContent = async (url) => {
+  const res = await fetch(`${API_URL}/content/fetch-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+};
 
 // Activities
 export const fetchActivities = (contactId) =>

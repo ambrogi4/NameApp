@@ -9,26 +9,26 @@ import {
 import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
 import ContentTable from './ContentTable';
+import ContentUrlFetcher from './ContentUrlFetcher';
 import ActivityTable from './ActivityTable';
 import DupeReviewModal from './DupeReviewModal';
-import FancyFilterPanel from './FancyFilterPanel';
+import FancyFilterPage from './FancyFilterPage';
+import ReportsPage from './ReportsPage';
 import { findDuplicate, findDuplicates } from './dupeUtils';
 import './App.css';
 
 function App() {
-  const TAB_ORDER = ['activities', 'contacts', 'content'];
+  const TAB_ORDER = ['activities', 'contacts', 'content', 'filter', 'reports'];
   const [tab, setTab] = useState('activities');
   const [contacts, setContacts] = useState([]);
   const [content, setContent] = useState([]);
   const [activities, setActivities] = useState([]);
   const [prefillContactId, setPrefillContactId] = useState(null);
+  const [prefillContentId, setPrefillContentId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
   const [quickFilterText, setQuickFilterText] = useState('');
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
-  const [showFancyFilter, setShowFancyFilter] = useState(false);
-  const [fancyFilterResults, setFancyFilterResults] = useState(null);
-  const [fancyFilterResultTable, setFancyFilterResultTable] = useState(null);
 
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
@@ -43,22 +43,21 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!e.altKey) return;
       // Alt+G: open global lookup
-      if (e.altKey && e.key === 'g') {
+      if (e.key === 'g') {
         e.preventDefault();
         setShowLookup(true);
         setLookupSearch('');
         return;
       }
-      // Alt+F: open fancy filter
-      if (e.altKey && e.key === 'f') {
-        e.preventDefault();
-        setShowFancyFilter(true);
-        setFancyFilterResults(null);
-        setFancyFilterResultTable(null);
-        return;
-      }
-      if (!e.altKey) return;
+      // Direct tab shortcuts
+      if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
+      if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
+      if (e.key === 'n') { e.preventDefault(); setTab('content'); return; }
+      if (e.key === 'f') { e.preventDefault(); setTab('filter'); return; }
+      if (e.key === 'r') { e.preventDefault(); setTab('reports'); return; }
+      // Alt+Up/Down: sequential cycling
       const idx = TAB_ORDER.indexOf(tab);
       if (e.key === 'ArrowUp' && idx > 0) {
         e.preventDefault();
@@ -183,23 +182,15 @@ function App() {
     setTab('activities');
   };
 
+  const handleNewActivityForContent = (contentItem) => {
+    setPrefillContentId(contentItem.id);
+    setTab('activities');
+  };
+
   const handleCloseLookup = useCallback(() => {
     setShowLookup(false);
     setLookupSearch('');
   }, []);
-
-  const handleCloseFancyFilter = useCallback(() => {
-    setShowFancyFilter(false);
-    setFancyFilterResults(null);
-    setFancyFilterResultTable(null);
-  }, []);
-
-  const handleRunFancyFilter = useCallback((template, params) => {
-    const data = { contacts, activities, content };
-    const results = template.execute(data, params);
-    setFancyFilterResults(results);
-    setFancyFilterResultTable(template.resultTable);
-  }, [contacts, activities, content]);
 
   const handleDeleteActivity = (id) => {
     if (!window.confirm('Delete this activity?')) return;
@@ -217,6 +208,8 @@ function App() {
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
             <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
             <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
+            <button className={tab === 'filter' ? 'tab active' : 'tab'} onClick={() => setTab('filter')}>Filter</button>
+            <button className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>Reports</button>
           </div>
           <div className="app-bar-right">
             {tab === 'contacts' && (
@@ -247,7 +240,8 @@ function App() {
               onCreateActivity={handleCreateActivity}
               onDelete={handleDeleteActivity}
               prefillContactId={prefillContactId}
-              onClearPrefill={() => setPrefillContactId(null)}
+              prefillContentId={prefillContentId}
+              onClearPrefill={() => { setPrefillContactId(null); setPrefillContentId(null); }}
             />
           </div>
           <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
@@ -264,12 +258,36 @@ function App() {
             />
           </div>
           <div style={{ display: tab === 'content' ? 'block' : 'none' }}>
+            <ContentUrlFetcher onFetched={handleCreateContent} />
             <ContentTable
               ref={contentTableRef}
               content={content}
               onUpdateContent={handleUpdateContent}
               onCreateContent={handleCreateContent}
               onDelete={handleDeleteContent}
+              onNewActivity={handleNewActivityForContent}
+            />
+          </div>
+          <div style={{ display: tab === 'filter' ? 'block' : 'none' }}>
+            <FancyFilterPage
+              contacts={contacts}
+              activities={activities}
+              content={content}
+              onUpdateContact={handleUpdateContact}
+              onUpdateActivity={handleUpdateActivity}
+              onCreateActivity={handleCreateActivity}
+              onDeleteActivity={handleDeleteActivity}
+              onNewActivityForContact={handleNewActivityForContact}
+              onUpdateContent={handleUpdateContent}
+              onDeleteContent={handleDeleteContent}
+              onNewActivityForContent={handleNewActivityForContent}
+            />
+          </div>
+          <div style={{ display: tab === 'reports' ? 'block' : 'none' }}>
+            <ReportsPage
+              contacts={contacts}
+              activities={activities}
+              content={content}
             />
           </div>
         </main>
@@ -297,45 +315,6 @@ function App() {
                 lookupMode
                 onDismiss={handleCloseLookup}
               />
-            </div>
-          </div>
-        )}
-        {showFancyFilter && (
-          <div className="lookup-overlay" onKeyDown={(e) => { if (e.key === 'Escape' && !e.altKey) { e.stopPropagation(); handleCloseFancyFilter(); } }}>
-            <div className="lookup-header">
-              <span className="lookup-title">Fancy Filter</span>
-              <FancyFilterPanel
-                contacts={contacts}
-                content={content}
-                onRun={handleRunFancyFilter}
-                resultCount={fancyFilterResults ? fancyFilterResults.length : null}
-              />
-              <span className="lookup-hint">Alt+F to open | Esc to close</span>
-              <button className="lookup-close" onClick={handleCloseFancyFilter}>&times;</button>
-            </div>
-            <div className="lookup-grid-container">
-              {fancyFilterResults && fancyFilterResultTable === 'contacts' && (
-                <ContactTable
-                  contacts={fancyFilterResults}
-                  onUpdateContact={handleUpdateContact}
-                  onNewActivity={handleNewActivityForContact}
-                  quickFilterText=""
-                  lookupMode
-                  onDismiss={handleCloseFancyFilter}
-                />
-              )}
-              {fancyFilterResults && fancyFilterResultTable === 'activities' && (
-                <ActivityTable
-                  activities={fancyFilterResults}
-                  contacts={contacts}
-                  content={content}
-                  onUpdateActivity={handleUpdateActivity}
-                  onCreateActivity={handleCreateActivity}
-                  onDelete={handleDeleteActivity}
-                  lookupMode
-                  onDismiss={handleCloseFancyFilter}
-                />
-              )}
             </div>
           </div>
         )}

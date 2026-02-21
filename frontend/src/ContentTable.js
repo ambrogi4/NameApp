@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 
-const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDelete }, ref) {
+const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDelete, onNewActivity }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -17,6 +17,10 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
   newRowRef.current = newRow;
   const onDeleteRef = useRef(onDelete);
   onDeleteRef.current = onDelete;
+  const onNewActivityRef = useRef(onNewActivity);
+  onNewActivityRef.current = onNewActivity;
+
+  const containerRef = useRef(null);
 
   const columnDefs = useMemo(() => [
     { field: 'id', hide: true },
@@ -99,8 +103,51 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, []);
 
+  // Keyboard shortcuts: Alt+A to create activity for focused content row
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleKeyDown = (e) => {
+      // Alt+U: open URL in focused cell
+      if (e.altKey && e.key === 'u') {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          const cell = api.getFocusedCell();
+          if (cell && !cell.rowPinned) {
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode) {
+              const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+              const val = rowNode.data[colId];
+              if (typeof val === 'string' && val.trim()) {
+                let url = val.trim();
+                if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+                window.open(url, '_blank');
+              }
+            }
+          }
+        }
+        return;
+      }
+      if (e.altKey && e.key === 'a') {
+        e.preventDefault();
+        const cell = gridRef.current?.api?.getFocusedCell();
+        if (cell) {
+          const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode && !rowNode.rowPinned) {
+            e.stopPropagation();
+            onNewActivityRef.current(rowNode.data);
+          }
+        }
+      }
+    };
+    el.addEventListener('keydown', handleKeyDown);
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
-    <div className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }}>
+    <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 75px)' }} tabIndex={0}>
       <AgGridReact
         ref={gridRef}
         theme={themeBalham}

@@ -4,7 +4,7 @@ import { themeBalham } from 'ag-grid-community';
 import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import SelectCellEditor from './SelectCellEditor';
 
-const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, onClearPrefill, lookupMode, onDismiss }, ref) {
+const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, prefillContentId, onClearPrefill, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -32,12 +32,30 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
     }, 100);
   }, []);
 
+  const focusPinnedContent = useCallback(() => {
+    setTimeout(() => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      const pinnedRowCount = api.getPinnedBottomRowCount();
+      if (pinnedRowCount > 0) {
+        api.setFocusedCell(0, 'content_id', 'bottom');
+      }
+    }, 100);
+  }, []);
+
   useEffect(() => {
     if (prefillContactId) {
       setNewRow(prev => ({ ...prev, contact_id: prefillContactId }));
       focusPinnedContact();
     }
   }, [prefillContactId, focusPinnedContact]);
+
+  useEffect(() => {
+    if (prefillContentId) {
+      setNewRow(prev => ({ ...prev, content_id: prefillContentId }));
+      focusPinnedContent();
+    }
+  }, [prefillContentId, focusPinnedContent]);
 
   // Keyboard shortcuts: Ctrl+Enter to save, Alt+A to copy contact from focused row
   useEffect(() => {
@@ -54,6 +72,29 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         return;
       }
 
+      // Alt+U: open URL in focused cell
+      if (e.altKey && e.key === 'u') {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          const cell = api.getFocusedCell();
+          if (cell && cell.rowPinned !== 'bottom') {
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode) {
+              const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+              const val = rowNode.data[colId];
+              if (typeof val === 'string' && val.trim()) {
+                let url = val.trim();
+                if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+                window.open(url, '_blank');
+              }
+            }
+          }
+        }
+        return;
+      }
+
       // Alt+Enter: jump to pinned new row
       if (e.altKey && e.key === 'Enter') {
         e.preventDefault();
@@ -64,6 +105,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       // Alt+A: copy contact_id from focused row into new row
       if (e.altKey && e.key === 'a') {
         e.preventDefault();
+        e.stopPropagation();
         const api = gridRef.current?.api;
         if (!api) return;
         const cell = api.getFocusedCell();

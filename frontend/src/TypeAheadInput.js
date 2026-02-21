@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-function TypeAheadInput({ options, value, onChange, placeholder }) {
+function TypeAheadInput({ options, value, onChange, placeholder, lightMode }) {
   const [inputText, setInputText] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -76,11 +76,13 @@ function TypeAheadInput({ options, value, onChange, placeholder }) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const cls = (base) => lightMode ? `${base}-light` : base;
+
   return (
     <div ref={containerRef} className="typeahead-container">
       <input
         type="text"
-        className="typeahead-input"
+        className={cls('typeahead-input')}
         value={value ? selectedLabel : inputText}
         onChange={handleInputChange}
         onFocus={() => { if (!value) setIsOpen(true); }}
@@ -89,7 +91,7 @@ function TypeAheadInput({ options, value, onChange, placeholder }) {
       />
       {value && (
         <button
-          className="typeahead-clear"
+          className={cls('typeahead-clear')}
           onClick={() => { onChange(''); setInputText(''); }}
           tabIndex={-1}
         >
@@ -97,11 +99,11 @@ function TypeAheadInput({ options, value, onChange, placeholder }) {
         </button>
       )}
       {isOpen && filtered.length > 0 && (
-        <ul ref={listRef} className="typeahead-list">
+        <ul ref={listRef} className={cls('typeahead-list')}>
           {filtered.slice(0, 50).map((opt, i) => (
             <li
               key={opt.value}
-              className={i === highlightIndex ? 'typeahead-item typeahead-highlighted' : 'typeahead-item'}
+              className={i === highlightIndex ? `${cls('typeahead-item')} ${cls('typeahead-highlighted')}` : cls('typeahead-item')}
               onMouseDown={() => handleSelect(opt)}
               onMouseEnter={() => setHighlightIndex(i)}
             >

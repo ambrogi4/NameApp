@@ -1,10 +1,49 @@
 // Fancy Filter Templates — cross-table query definitions
 // Each template has: id, label, resultTable, params[], execute(data, params)
+// Sorted: Activities... → Contacts... → Content...
 
 const templates = [
   {
-    id: 'contacts_at_firm_no_outreach',
-    label: 'Contacts at [firm] with no outreach since [date]',
+    id: 'activities_to_contact',
+    label: 'Activities to [contact]',
+    resultTable: 'activities',
+    params: [
+      { key: 'contact', type: 'contact', label: 'Contact', required: true },
+    ],
+    execute: (data, params) => {
+      const { activities } = data;
+      const contactId = Number(params.contact);
+      return activities.filter(a => a.contact_id === contactId);
+    },
+  },
+  {
+    id: 'activities_to_firm_since',
+    label: 'Activities to [firm] since [date]',
+    resultTable: 'activities',
+    params: [
+      { key: 'firm', type: 'firm', label: 'Firm', required: true },
+      { key: 'date', type: 'date', label: 'Since date', required: true,
+        defaultValue: () => {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          return d.toISOString().slice(0, 10);
+        },
+      },
+    ],
+    execute: (data, params) => {
+      const { contacts, activities } = data;
+      const firm = params.firm.toLowerCase();
+      const firmContactIds = new Set(
+        contacts.filter(c => (c.firm || '').toLowerCase() === firm).map(c => c.id)
+      );
+      return activities.filter(a =>
+        firmContactIds.has(a.contact_id) && (a.activity_date || '') >= params.date
+      );
+    },
+  },
+  {
+    id: 'contacts_at_firm_no_activity',
+    label: 'Contacts at [firm] with no activity since [date]',
     resultTable: 'contacts',
     params: [
       { key: 'firm', type: 'firm', label: 'Firm', required: true },
@@ -22,45 +61,6 @@ const templates = [
         );
         return (latest.activity_date || '') < params.date;
       });
-    },
-  },
-  {
-    id: 'recent_outreach_to_firm',
-    label: 'Most recent outreach to anyone at [firm]',
-    resultTable: 'activities',
-    params: [
-      { key: 'firm', type: 'firm', label: 'Firm', required: true },
-    ],
-    execute: (data, params) => {
-      const { contacts, activities } = data;
-      const firm = params.firm.toLowerCase();
-      const firmContactIds = new Set(
-        contacts.filter(c => (c.firm || '').toLowerCase() === firm).map(c => c.id)
-      );
-      const firmActivities = activities.filter(a => firmContactIds.has(a.contact_id));
-      // Return all activities sorted by date descending
-      return [...firmActivities].sort((a, b) =>
-        (b.activity_date || '').localeCompare(a.activity_date || '')
-      );
-    },
-  },
-  {
-    id: 'all_outreach_to_firm_since',
-    label: 'All outreach to [firm] since [date]',
-    resultTable: 'activities',
-    params: [
-      { key: 'firm', type: 'firm', label: 'Firm', required: true },
-      { key: 'date', type: 'date', label: 'Since date', required: true },
-    ],
-    execute: (data, params) => {
-      const { contacts, activities } = data;
-      const firm = params.firm.toLowerCase();
-      const firmContactIds = new Set(
-        contacts.filter(c => (c.firm || '').toLowerCase() === firm).map(c => c.id)
-      );
-      return activities.filter(a =>
-        firmContactIds.has(a.contact_id) && (a.activity_date || '') >= params.date
-      );
     },
   },
   {
@@ -84,8 +84,8 @@ const templates = [
     },
   },
   {
-    id: 'contacts_with_tag_no_outreach',
-    label: 'Contacts with tag [tag] with no outreach since [date]',
+    id: 'contacts_with_tag_no_activity',
+    label: 'Contacts with tag [tag] with no activity since [date]',
     resultTable: 'contacts',
     params: [
       { key: 'tag', type: 'tag', label: 'Tag', required: true },
@@ -109,16 +109,42 @@ const templates = [
     },
   },
   {
-    id: 'all_outreach_to_contact',
-    label: 'All outreach to [contact]',
-    resultTable: 'activities',
-    params: [
-      { key: 'contact', type: 'contact', label: 'Contact', required: true },
-    ],
-    execute: (data, params) => {
-      const { activities } = data;
-      const contactId = Number(params.contact);
-      return activities.filter(a => a.contact_id === contactId);
+    id: 'content_with_most_activity',
+    label: 'Content with most activity',
+    resultTable: 'content',
+    params: [],
+    execute: (data) => {
+      const { content, activities } = data;
+      if (content.length === 0) return [];
+      const counts = {};
+      activities.forEach(a => {
+        if (a.content_id != null) {
+          counts[a.content_id] = (counts[a.content_id] || 0) + 1;
+        }
+      });
+      let maxId = null;
+      let maxCount = 0;
+      for (const [id, count] of Object.entries(counts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          maxId = Number(id);
+        }
+      }
+      if (maxId == null) return [];
+      return content.filter(c => c.id === maxId);
+    },
+  },
+  {
+    id: 'content_with_no_activity',
+    label: 'Content with no activity',
+    resultTable: 'content',
+    params: [],
+    execute: (data) => {
+      const { content, activities } = data;
+      const contentIdsWithActivity = new Set(
+        activities.map(a => a.content_id).filter(id => id != null)
+      );
+      return content.filter(c => !contentIdsWithActivity.has(c.id));
     },
   },
 ];
