@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider } from 'ag-grid-react';
 import {
+  fetchConfig,
   fetchContacts, createContact, updateContact, deleteContact, createContactsBatch,
   fetchContent, createContent, updateContent, deleteContent,
   fetchActivities, createActivity, updateActivity, deleteActivity,
@@ -15,6 +16,7 @@ import DupeReviewModal from './DupeReviewModal';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
 import { findDuplicate, findDuplicates } from './dupeUtils';
+import { confirmBulkDelete } from './gridUtils';
 import './App.css';
 
 function App() {
@@ -26,6 +28,7 @@ function App() {
   const [prefillContactId, setPrefillContactId] = useState(null);
   const [prefillContentId, setPrefillContentId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
+  const [instanceName, setInstanceName] = useState('myCRM');
   const [quickFilterText, setQuickFilterText] = useState('');
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
@@ -72,6 +75,10 @@ function App() {
   }, [tab, TAB_ORDER]);
 
   useEffect(() => {
+    fetchConfig().then(cfg => {
+      setInstanceName(cfg.instanceName);
+      document.title = cfg.instanceName;
+    }).catch(console.error);
     fetchContacts().then(setContacts).catch(console.error);
     fetchContent().then(setContent).catch(console.error);
     fetchActivities().then(setActivities).catch(console.error);
@@ -131,7 +138,7 @@ function App() {
   };
 
   const handleDeleteContactsBatch = (ids) => {
-    if (!window.confirm(`Delete ${ids.length} contact(s) and all their activities?`)) return;
+    if (!confirmBulkDelete(ids.length, 'contact')) return;
     Promise.all(ids.map(id => deleteContact(id)))
       .then(() => {
         const idSet = new Set(ids);
@@ -160,6 +167,17 @@ function App() {
       .then(() => {
         setContent(prev => prev.filter(c => c.id !== id));
         setActivities(prev => prev.map(a => a.content_id === id ? { ...a, content_id: null } : a));
+      })
+      .catch(console.error);
+  };
+
+  const handleDeleteContentBatch = (ids) => {
+    if (!confirmBulkDelete(ids.length, 'content item')) return;
+    Promise.all(ids.map(id => deleteContent(id)))
+      .then(() => {
+        const idSet = new Set(ids);
+        setContent(prev => prev.filter(c => !idSet.has(c.id)));
+        setActivities(prev => prev.map(a => idSet.has(a.content_id) ? { ...a, content_id: null } : a));
       })
       .catch(console.error);
   };
@@ -199,11 +217,21 @@ function App() {
       .catch(console.error);
   };
 
+  const handleDeleteActivitiesBatch = (ids) => {
+    if (!confirmBulkDelete(ids.length, 'activity')) return;
+    Promise.all(ids.map(id => deleteActivity(id)))
+      .then(() => {
+        const idSet = new Set(ids);
+        setActivities(prev => prev.filter(a => !idSet.has(a.id)));
+      })
+      .catch(console.error);
+  };
+
   return (
     <AgGridProvider modules={[AllCommunityModule]}>
       <div className="App">
         <div className="app-bar">
-          <span className="app-bar-title">myCRM</span>
+          <span className="app-bar-title">{instanceName}</span>
           <div className="app-bar-tabs">
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
             <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
@@ -212,7 +240,7 @@ function App() {
             <button className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>Reports</button>
           </div>
           <div className="app-bar-right">
-            {tab === 'contacts' && (
+            {(tab === 'contacts' || tab === 'activities' || tab === 'content') && (
               <input
                 type="text"
                 className="app-bar-search"
@@ -238,7 +266,8 @@ function App() {
               content={content}
               onUpdateActivity={handleUpdateActivity}
               onCreateActivity={handleCreateActivity}
-              onDelete={handleDeleteActivity}
+              onDeleteBatch={handleDeleteActivitiesBatch}
+              quickFilterText={quickFilterText}
               prefillContactId={prefillContactId}
               prefillContentId={prefillContentId}
               onClearPrefill={() => { setPrefillContactId(null); setPrefillContentId(null); }}
@@ -264,8 +293,9 @@ function App() {
               content={content}
               onUpdateContent={handleUpdateContent}
               onCreateContent={handleCreateContent}
-              onDelete={handleDeleteContent}
+              onDeleteBatch={handleDeleteContentBatch}
               onNewActivity={handleNewActivityForContent}
+              quickFilterText={quickFilterText}
             />
           </div>
           <div style={{ display: tab === 'filter' ? 'block' : 'none' }}>
@@ -276,10 +306,10 @@ function App() {
               onUpdateContact={handleUpdateContact}
               onUpdateActivity={handleUpdateActivity}
               onCreateActivity={handleCreateActivity}
-              onDeleteActivity={handleDeleteActivity}
+              onDeleteActivitiesBatch={handleDeleteActivitiesBatch}
               onNewActivityForContact={handleNewActivityForContact}
               onUpdateContent={handleUpdateContent}
-              onDeleteContent={handleDeleteContent}
+              onDeleteContentBatch={handleDeleteContentBatch}
               onNewActivityForContent={handleNewActivityForContent}
             />
           </div>

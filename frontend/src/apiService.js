@@ -32,6 +32,9 @@ async function apiDelete(path) {
   return res.json();
 }
 
+// Config
+export const fetchConfig = () => apiGet('/config');
+
 // Contacts
 export const fetchContacts = () => apiGet('/contacts');
 export const createContact = (data) => apiPost('/contacts', data);

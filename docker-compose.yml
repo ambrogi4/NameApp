@@ -1,28 +1,51 @@
 version: '3.8'
 services:
-  db:
+  db_work:
     image: postgres:13
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres_work:/var/lib/postgresql/data/
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=nameapp
-    ports:
-      - "5432:5432"
+      - POSTGRES_DB=nameapp_work
 
-  backend:
+  backend_work:
     build:
       context: .
       dockerfile: backend/Dockerfile
     ports:
       - "5000:5000"
     depends_on:
-      - db
+      - db_work
     environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/nameapp
+      - DATABASE_URL=postgresql://user:password@db_work:5432/nameapp_work
       - FLASK_APP=app.py
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - INSTANCE_NAME=myCRM Work
+
+  db_charity:
+    image: postgres:13
+    volumes:
+      - postgres_charity:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=nameapp_charity
+
+  backend_charity:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5001:5000"
+    depends_on:
+      - db_charity
+    environment:
+      - DATABASE_URL=postgresql://user:password@db_charity:5432/nameapp_charity
+      - FLASK_APP=app.py
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - INSTANCE_NAME=myCRM Charity
 
 volumes:
-  postgres_data:
+  postgres_work:
+  postgres_charity:
