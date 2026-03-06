@@ -4,7 +4,7 @@ import ContactTable from './ContactTable';
 import ActivityTable from './ActivityTable';
 import ContentTable from './ContentTable';
 
-function FancyFilterPage({ contacts, activities, content, onUpdateContact, onUpdateActivity, onCreateActivity, onDeleteActivity, onNewActivityForContact, onUpdateContent, onDeleteContent, onNewActivityForContent }) {
+function FancyFilterPage({ contacts, activities, content, onUpdateContact, onUpdateActivity, onCreateActivity, onDeleteActivitiesBatch, onNewActivityForContact, onUpdateContent, onDeleteContentBatch, onNewActivityForContent }) {
   const [fancyFilterResults, setFancyFilterResults] = useState(null);
   const [fancyFilterResultTable, setFancyFilterResultTable] = useState(null);
 
@@ -43,7 +43,7 @@ function FancyFilterPage({ contacts, activities, content, onUpdateContact, onUpd
             content={content}
             onUpdateActivity={onUpdateActivity}
             onCreateActivity={onCreateActivity}
-            onDelete={onDeleteActivity}
+            onDeleteBatch={onDeleteActivitiesBatch}
             lookupMode
           />
         )}
@@ -52,7 +52,7 @@ function FancyFilterPage({ contacts, activities, content, onUpdateContact, onUpd
             content={fancyFilterResults}
             onUpdateContent={onUpdateContent}
             onCreateContent={() => {}}
-            onDelete={onDeleteContent}
+            onDeleteBatch={onDeleteContentBatch}
             onNewActivity={onNewActivityForContent}
             lookupMode
           />

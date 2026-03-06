@@ -543,6 +543,7 @@ def fetch_url_content():
 def get_config():
     return jsonify({
         'instanceName': os.environ.get('INSTANCE_NAME', 'myCRM'),
+        'instanceColor': os.environ.get('INSTANCE_COLOR', '#87CEEB'),
     })
 
 

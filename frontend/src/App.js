@@ -29,6 +29,7 @@ function App() {
   const [prefillContentId, setPrefillContentId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
   const [instanceName, setInstanceName] = useState('myCRM');
+  const [instanceColor, setInstanceColor] = useState('#87CEEB');
   const [quickFilterText, setQuickFilterText] = useState('');
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
@@ -78,6 +79,7 @@ function App() {
     fetchConfig().then(cfg => {
       setInstanceName(cfg.instanceName);
       document.title = cfg.instanceName;
+      if (cfg.instanceColor) setInstanceColor(cfg.instanceColor);
     }).catch(console.error);
     fetchContacts().then(setContacts).catch(console.error);
     fetchContent().then(setContent).catch(console.error);
@@ -231,7 +233,7 @@ function App() {
     <AgGridProvider modules={[AllCommunityModule]}>
       <div className="App">
         <div className="app-bar">
-          <span className="app-bar-title">{instanceName}</span>
+          <span className="app-bar-title" style={{ background: instanceColor }}>{instanceName}</span>
           <div className="app-bar-tabs">
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
             <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>

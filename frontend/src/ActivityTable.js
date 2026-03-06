@@ -4,7 +4,7 @@ import { themeBalham } from 'ag-grid-community';
 import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import SelectCellEditor from './SelectCellEditor';
 
-const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDelete, prefillContactId, prefillContentId, onClearPrefill, lookupMode, onDismiss }, ref) {
+const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDeleteBatch, prefillContactId, prefillContentId, onClearPrefill, lookupMode, onDismiss, quickFilterText }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -16,8 +16,10 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
   const [newRow, setNewRow] = useState(createEmptyRow(ACTIVITY_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
-  const onDeleteRef = useRef(onDelete);
-  onDeleteRef.current = onDelete;
+  const onDeleteBatchRef = useRef(onDeleteBatch);
+  onDeleteBatchRef.current = onDeleteBatch;
+
+  const [selectedRows, setSelectedRows] = useState([]);
 
   const containerRef = useRef(null);
 
@@ -57,7 +59,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
     }
   }, [prefillContentId, focusPinnedContent]);
 
-  // Keyboard shortcuts: Ctrl+Enter to save, Alt+A to copy contact from focused row
+  // Keyboard shortcuts
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -68,6 +70,19 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         const row = newRowRef.current;
         if (row.contact_id) {
           handleSaveNewRef.current();
+        }
+        return;
+      }
+
+      // Shift+Alt+Left/Right: pagination
+      if (e.shiftKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          if (e.key === 'ArrowLeft') api.paginationGoToPreviousPage();
+          else api.paginationGoToNextPage();
+          setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'contact_id', null), 50);
         }
         return;
       }
@@ -95,10 +110,19 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         return;
       }
 
-      // Alt+Enter: jump to pinned new row
+      // Alt+Enter: save if on pinned row, otherwise jump to pinned row
       if (e.altKey && e.key === 'Enter') {
         e.preventDefault();
-        focusPinnedContact();
+        const api = gridRef.current?.api;
+        const cell = api?.getFocusedCell();
+        if (cell && cell.rowPinned === 'bottom') {
+          const row = newRowRef.current;
+          if (row.contact_id) {
+            handleSaveNewRef.current();
+          }
+        } else {
+          focusPinnedContact();
+        }
         return;
       }
 
@@ -118,10 +142,27 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         }
         return;
       }
+
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        gridRef.current?.api?.deselectAll();
+        setSelectedRows([]);
+        return;
+      }
+
+      if (e.key === 'Delete' && selectedRows.length > 0) {
+        e.preventDefault();
+        onDeleteBatchRef.current(selectedRows);
+        setSelectedRows([]);
+        gridRef.current?.api?.deselectAll();
+      }
     };
     el.addEventListener('keydown', handleKeyDown);
     return () => el.removeEventListener('keydown', handleKeyDown);
-  }, [focusPinnedContact]);
+  }, [focusPinnedContact, selectedRows]);
 
   const handleSaveNewRef = useRef(null);
 
@@ -152,7 +193,25 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
   const contentOptionsRef = useRef(contentOptions);
   contentOptionsRef.current = contentOptions;
 
+  // Refresh formatted values when contacts/content load or change
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (api) {
+      api.refreshCells({ columns: ['contact_id', 'content_id'], force: true });
+    }
+  }, [contacts, content]);
+
   const columnDefs = useMemo(() => [
+    {
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 50,
+      pinned: 'left',
+      sortable: false,
+      filter: false,
+      editable: false,
+      lockPosition: true,
+    },
     { field: 'id', hide: true },
     {
       field: 'contact_id',
@@ -160,6 +219,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       width: 150,
       editable: true,
       valueFormatter: (params) => contactNameRef.current(params.value),
+      getQuickFilterText: (params) => contactNameRef.current(params.value),
       cellEditor: SelectCellEditor,
       cellEditorParams: () => ({ options: contactOptionsRef.current, numeric: true, allowNull: false }),
     },
@@ -169,6 +229,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       width: 140,
       editable: true,
       valueFormatter: (params) => contentNameRef.current(params.value),
+      getQuickFilterText: (params) => contentNameRef.current(params.value),
       cellEditor: SelectCellEditor,
       cellEditorParams: () => ({ options: contentOptionsRef.current, numeric: true, allowNull: true }),
     },
@@ -179,7 +240,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: { values: CHANNELS },
     },
-    { field: 'activity_date', headerName: 'Date', width: 110, editable: true },
+    { field: 'activity_date', headerName: 'Date', width: 110, editable: true, cellEditor: 'agDateStringCellEditor' },
     { field: 'topic', width: 180, editable: true },
     { field: 'comment', width: 180, editable: true },
     {
@@ -202,28 +263,6 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       width: 60,
       editable: true,
       cellDataType: 'boolean',
-    },
-    {
-      headerName: 'Actions',
-      pinned: 'right',
-      width: 100,
-      sortable: false,
-      filter: false,
-      editable: false,
-      cellRenderer: (params) => {
-        if (isPinnedRow(params)) {
-          return (
-            <button onClick={() => handleSaveNew()} style={{ fontSize: 12, padding: '2px 8px' }}>
-              Save
-            </button>
-          );
-        }
-        return (
-          <button className="delete-btn" onClick={() => onDeleteRef.current(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
-            Delete
-          </button>
-        );
-      },
     },
   ], []);
 
@@ -256,9 +295,20 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
     onUpdateActivity(id, rest);
   }, [onUpdateActivity]);
 
+  const onSelectionChanged = useCallback(() => {
+    const nodes = gridRef.current?.api?.getSelectedNodes() || [];
+    const ids = nodes
+      .filter(n => !n.rowPinned)
+      .map(n => n.data.id)
+      .filter(id => id != null);
+    setSelectedRows(ids);
+  }, []);
+
   const pinnedBottomRowData = useMemo(() => lookupMode ? undefined : [newRow], [newRow, lookupMode]);
 
-  const STORAGE_KEY = 'activityTable_columnState';
+  const newRowHasData = !lookupMode && newRow.contact_id;
+
+  const STORAGE_KEY = 'activityTable_columnState_v2';
 
   const onGridReady = useCallback((params) => {
     if (lookupMode) return;
@@ -277,23 +327,53 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
   }, [lookupMode]);
 
   return (
-    <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }} tabIndex={0}>
-      <AgGridReact
-        ref={gridRef}
-        theme={themeBalham}
-        rowData={activities}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        pinnedBottomRowData={pinnedBottomRowData}
-        onCellValueChanged={onCellValueChanged}
-        onGridReady={onGridReady}
-        onSortChanged={saveColumnState}
-        onColumnResized={saveColumnState}
-        onColumnMoved={saveColumnState}
-        onFilterChanged={saveColumnState}
-        getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
-        stopEditingWhenCellsLoseFocus={true}
-      />
+    <div>
+      {!lookupMode && (newRowHasData || selectedRows.length > 0) && (
+        <div className="contact-toolbar">
+          {newRowHasData && (
+            <button onClick={handleSaveNew} style={{ backgroundColor: '#4CAF50', color: 'white' }}>
+              Save New
+            </button>
+          )}
+          {selectedRows.length > 0 && (
+            <button
+              className="delete-btn"
+              onClick={() => {
+                onDeleteBatchRef.current(selectedRows);
+                setSelectedRows([]);
+                gridRef.current?.api?.deselectAll();
+              }}
+            >
+              Delete Selected ({selectedRows.length})
+            </button>
+          )}
+        </div>
+      )}
+      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 42px)' }} tabIndex={0}>
+        <AgGridReact
+          ref={gridRef}
+          theme={themeBalham}
+          rowData={activities}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          pinnedBottomRowData={pinnedBottomRowData}
+          onCellValueChanged={onCellValueChanged}
+          onGridReady={onGridReady}
+          onSortChanged={saveColumnState}
+          onColumnResized={saveColumnState}
+          onColumnMoved={saveColumnState}
+          onFilterChanged={saveColumnState}
+          getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
+          stopEditingWhenCellsLoseFocus={true}
+          quickFilterText={quickFilterText}
+          pagination={true}
+          paginationPageSize={20}
+          paginationPageSizeSelector={[20, 100]}
+          rowSelection="multiple"
+          suppressRowClickSelection={true}
+          onSelectionChanged={onSelectionChanged}
+        />
+      </div>
     </div>
   );
 });

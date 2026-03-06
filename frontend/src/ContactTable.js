@@ -231,6 +231,19 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      // Shift+Alt+Left/Right: pagination
+      if (e.shiftKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          if (e.key === 'ArrowLeft') api.paginationGoToPreviousPage();
+          else api.paginationGoToNextPage();
+          setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'first', null), 50);
+        }
+        return;
+      }
+
       if (e.key === 'Escape') {
         e.preventDefault();
         gridRef.current?.api?.deselectAll();

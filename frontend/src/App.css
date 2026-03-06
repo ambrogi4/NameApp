@@ -742,6 +742,24 @@ button[type="submit"]:hover {
   max-width: 400px;
 }
 
+.report-text-block {
+  font-size: 13px;
+  line-height: 1.8;
+  text-align: left;
+  padding: 4px 0;
+}
+
+.report-text-line {
+  padding: 2px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.report-divider {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 16px 0;
+}
+
 .report-empty {
   color: #999;
   font-style: italic;

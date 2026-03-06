@@ -2,8 +2,9 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, u
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import TagModal from './TagModal';
 
-const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDelete, onNewActivity }, ref) {
+const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDeleteBatch, onNewActivity, quickFilterText, lookupMode }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -15,14 +16,66 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
   const [newRow, setNewRow] = useState(createEmptyRow(CONTENT_FIELDS));
   const newRowRef = useRef(newRow);
   newRowRef.current = newRow;
-  const onDeleteRef = useRef(onDelete);
-  onDeleteRef.current = onDelete;
   const onNewActivityRef = useRef(onNewActivity);
   onNewActivityRef.current = onNewActivity;
+  const onDeleteBatchRef = useRef(onDeleteBatch);
+  onDeleteBatchRef.current = onDeleteBatch;
+
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
+
+  const parseTags = (s) => (s || '').split(',').map(t => t.trim()).filter(Boolean);
+  const joinTags = (arr) => arr.join(', ');
+
+  const selectedContent = useMemo(() => {
+    const idSet = new Set(selectedRows);
+    return content.filter(c => idSet.has(c.id));
+  }, [selectedRows, content]);
+
+  const anySelectedHaveTags = useMemo(
+    () => selectedContent.some(c => parseTags(c.tags).length > 0),
+    [selectedContent]
+  );
+
+  const handleAddTags = useCallback((input) => {
+    const newTags = parseTags(input);
+    if (newTags.length === 0) return;
+    selectedContent.forEach(c => {
+      const existing = parseTags(c.tags);
+      const merged = [...existing, ...newTags.filter(t => !existing.includes(t))];
+      const { id, ...rest } = c;
+      onUpdateContent(id, { ...rest, tags: joinTags(merged) });
+    });
+    setTagModal(null);
+  }, [selectedContent, onUpdateContent]);
+
+  const handleDeleteTag = useCallback((input) => {
+    const tagToRemove = input.trim();
+    if (!tagToRemove) return;
+    selectedContent.forEach(c => {
+      const existing = parseTags(c.tags);
+      const filtered = existing.filter(t => t !== tagToRemove);
+      if (filtered.length !== existing.length) {
+        const { id, ...rest } = c;
+        onUpdateContent(id, { ...rest, tags: joinTags(filtered) });
+      }
+    });
+    setTagModal(null);
+  }, [selectedContent, onUpdateContent]);
 
   const containerRef = useRef(null);
 
   const columnDefs = useMemo(() => [
+    {
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 50,
+      pinned: 'left',
+      sortable: false,
+      filter: false,
+      editable: false,
+      lockPosition: true,
+    },
     { field: 'id', hide: true },
     {
       field: 'type',
@@ -39,28 +92,6 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     { field: 'link', width: 200, editable: true },
     { field: 'tags', width: 150, editable: true },
     { field: 'comment', width: 200, editable: true },
-    {
-      headerName: 'Actions',
-      pinned: 'right',
-      width: 100,
-      sortable: false,
-      filter: false,
-      editable: false,
-      cellRenderer: (params) => {
-        if (isPinnedRow(params)) {
-          return (
-            <button onClick={() => handleSaveNew()} style={{ fontSize: 12, padding: '2px 8px' }}>
-              Save
-            </button>
-          );
-        }
-        return (
-          <button className="delete-btn" onClick={() => onDeleteRef.current(params.data.id)} style={{ fontSize: 12, padding: '2px 8px' }}>
-            Delete
-          </button>
-        );
-      },
-    },
   ], []);
 
   const defaultColDef = useMemo(() => ({
@@ -85,29 +116,73 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     onUpdateContent(id, rest);
   }, [onUpdateContent]);
 
-  const pinnedBottomRowData = useMemo(() => [newRow], [newRow]);
+  const onSelectionChanged = useCallback(() => {
+    const nodes = gridRef.current?.api?.getSelectedNodes() || [];
+    const ids = nodes
+      .filter(n => !n.rowPinned)
+      .map(n => n.data.id)
+      .filter(id => id != null);
+    setSelectedRows(ids);
+  }, []);
 
-  const STORAGE_KEY = 'contentTable_columnState';
+  const pinnedBottomRowData = useMemo(() => lookupMode ? undefined : [newRow], [newRow, lookupMode]);
+
+  const newRowHasData = !lookupMode && (newRow.type || newRow.title || newRow.short_name);
+
+  const STORAGE_KEY = 'contentTable_columnState_v2';
 
   const onGridReady = useCallback((params) => {
+    if (lookupMode) return;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         params.api.applyColumnState({ state: JSON.parse(saved), applyOrder: true });
       } catch (e) { /* ignore bad data */ }
     }
-  }, []);
+  }, [lookupMode]);
 
   const saveColumnState = useCallback((params) => {
+    if (lookupMode) return;
     const state = params.api.getColumnState();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, []);
+  }, [lookupMode]);
 
-  // Keyboard shortcuts: Alt+A to create activity for focused content row
+  // Keyboard shortcuts
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Shift+Alt+Left/Right: pagination
+      if (e.shiftKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api) {
+          if (e.key === 'ArrowLeft') api.paginationGoToPreviousPage();
+          else api.paginationGoToNextPage();
+          setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'type', null), 50);
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        gridRef.current?.api?.deselectAll();
+        setSelectedRows([]);
+        return;
+      }
+
+      if (e.key === 'Delete' && selectedRows.length > 0) {
+        e.preventDefault();
+        onDeleteBatchRef.current(selectedRows);
+        setSelectedRows([]);
+        gridRef.current?.api?.deselectAll();
+        return;
+      }
+
       // Alt+U: open URL in focused cell
       if (e.altKey && e.key === 'u') {
         e.preventDefault();
@@ -130,6 +205,7 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
         }
         return;
       }
+      // Alt+A: create activity for focused content row
       if (e.altKey && e.key === 'a') {
         e.preventDefault();
         const cell = gridRef.current?.api?.getFocusedCell();
@@ -144,26 +220,82 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     };
     el.addEventListener('keydown', handleKeyDown);
     return () => el.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedRows]);
 
   return (
-    <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 75px)' }} tabIndex={0}>
-      <AgGridReact
-        ref={gridRef}
-        theme={themeBalham}
-        rowData={content}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        pinnedBottomRowData={pinnedBottomRowData}
-        onCellValueChanged={onCellValueChanged}
-        onGridReady={onGridReady}
-        onSortChanged={saveColumnState}
-        onColumnResized={saveColumnState}
-        onColumnMoved={saveColumnState}
-        onFilterChanged={saveColumnState}
-        getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
-        stopEditingWhenCellsLoseFocus={true}
-      />
+    <div>
+      {!lookupMode && (newRowHasData || selectedRows.length > 0) && (
+        <div className="contact-toolbar">
+          {newRowHasData && (
+            <button onClick={handleSaveNew} style={{ backgroundColor: '#4CAF50', color: 'white' }}>
+              Save New
+            </button>
+          )}
+          {selectedRows.length >= 2 && (
+            <button className="edit-btn" onClick={() => setTagModal('add')}>
+              Add Tags
+            </button>
+          )}
+          {selectedRows.length >= 2 && anySelectedHaveTags && (
+            <button className="activity-btn" onClick={() => setTagModal('delete')}>
+              Delete Tag
+            </button>
+          )}
+          {selectedRows.length > 0 && (
+            <button
+              className="delete-btn"
+              onClick={() => {
+                onDeleteBatchRef.current(selectedRows);
+                setSelectedRows([]);
+                gridRef.current?.api?.deselectAll();
+              }}
+            >
+              Delete Selected ({selectedRows.length})
+            </button>
+          )}
+        </div>
+      )}
+      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 75px)' }} tabIndex={0}>
+        <AgGridReact
+          ref={gridRef}
+          theme={themeBalham}
+          rowData={content}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          pinnedBottomRowData={pinnedBottomRowData}
+          onCellValueChanged={onCellValueChanged}
+          onGridReady={onGridReady}
+          onSortChanged={saveColumnState}
+          onColumnResized={saveColumnState}
+          onColumnMoved={saveColumnState}
+          onFilterChanged={saveColumnState}
+          getRowId={(params) => params.data.id != null ? String(params.data.id) : 'new'}
+          stopEditingWhenCellsLoseFocus={true}
+          quickFilterText={quickFilterText}
+          pagination={true}
+          paginationPageSize={20}
+          paginationPageSizeSelector={[20, 100]}
+          rowSelection="multiple"
+          suppressRowClickSelection={true}
+          onSelectionChanged={onSelectionChanged}
+        />
+      </div>
+      {tagModal === 'add' && (
+        <TagModal
+          title={`Add tags to ${selectedRows.length} content items`}
+          placeholder="Tag1, Tag2, ..."
+          onConfirm={handleAddTags}
+          onClose={() => setTagModal(null)}
+        />
+      )}
+      {tagModal === 'delete' && (
+        <TagModal
+          title={`Remove tag from ${selectedRows.length} content items`}
+          placeholder="Tag to remove"
+          onConfirm={handleDeleteTag}
+          onClose={() => setTagModal(null)}
+        />
+      )}
     </div>
   );
 });

@@ -2,6 +2,21 @@ import React, { useState, useMemo, useCallback } from 'react';
 import templates from './fancyFilterTemplates';
 import TypeAheadInput from './TypeAheadInput';
 
+// Group templates by the first word of their label (Activities, Contacts, Content, etc.)
+const groupedTemplates = (() => {
+  const groups = [];
+  let currentGroup = null;
+  templates.forEach(t => {
+    const group = t.label.split(' ')[0];
+    if (group !== currentGroup) {
+      groups.push({ label: group, items: [] });
+      currentGroup = group;
+    }
+    groups[groups.length - 1].items.push(t);
+  });
+  return groups;
+})();
+
 function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) {
   const [templateId, setTemplateId] = useState('');
   const [params, setParams] = useState({});
@@ -88,8 +103,12 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) 
         onChange={handleTemplateChange}
       >
         <option value="">Select a query...</option>
-        {templates.map(t => (
-          <option key={t.id} value={t.id}>{t.label}</option>
+        {groupedTemplates.map(g => (
+          <optgroup key={g.label} label={g.label}>
+            {g.items.map(t => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </optgroup>
         ))}
       </select>
 

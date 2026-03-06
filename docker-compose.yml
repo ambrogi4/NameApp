@@ -7,7 +7,7 @@ services:
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=nameapp_work
+      - POSTGRES_DB=nameapp
 
   backend_work:
     build:
@@ -18,10 +18,11 @@ services:
     depends_on:
       - db_work
     environment:
-      - DATABASE_URL=postgresql://user:password@db_work:5432/nameapp_work
+      - DATABASE_URL=postgresql://user:password@db_work:5432/nameapp
       - FLASK_APP=app.py
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - INSTANCE_NAME=myCRM Work
+      - INSTANCE_COLOR=#F5A623
 
   db_charity:
     image: postgres:13
@@ -45,6 +46,7 @@ services:
       - FLASK_APP=app.py
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - INSTANCE_NAME=myCRM Charity
+      - INSTANCE_COLOR=#87CEEB
 
 volumes:
   postgres_work:

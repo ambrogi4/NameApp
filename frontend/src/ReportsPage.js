@@ -55,6 +55,31 @@ function ReportsPage({ contacts, activities, content }) {
     return m;
   }, [content]);
 
+  // "This Week's Activity" — last 7 days, auto-computed
+  const weeklyActivities = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return activities
+      .filter(a => a.activity_date && a.activity_date >= cutoffStr)
+      .sort((a, b) => (b.activity_date || '').localeCompare(a.activity_date || ''))
+      .map(a => {
+        const c = contactMap[a.contact_id];
+        const contactLabel = c
+          ? [c.first, c.last].filter(Boolean).join(' ')
+            + (c.title ? `, ${c.title}` : '')
+            + (c.firm ? ` at ${c.firm}` : '')
+          : `#${a.contact_id}`;
+        const contentItem = a.content_id ? contentMap[a.content_id] : null;
+        const parts = [formatDate(a.activity_date), contactLabel];
+        if (a.channel) parts.push(`via ${a.channel}`);
+        if (a.topic) parts.push(`— ${a.topic}`);
+        if (contentItem) parts.push(`[${contentItem.short_name || contentItem.title || '#' + contentItem.id}]`);
+        if (a.comment) parts.push(`// ${a.comment}`);
+        return parts.join('  ');
+      });
+  }, [activities, contactMap, contentMap]);
+
   const handleRun = () => {
     const opt = quarterOptions[selectedQuarter];
     const { start, end } = quarterDateRange(opt.year, opt.quarter);
@@ -196,6 +221,18 @@ function ReportsPage({ contacts, activities, content }) {
 
   return (
     <div className="reports-page">
+      <div className="report-section">
+        <h3>This Week's Activity</h3>
+        {weeklyActivities.length === 0
+          ? <p className="report-empty">No activity in the last 7 days</p>
+          : <div className="report-text-block">
+              {weeklyActivities.map((line, i) => (
+                <div key={i} className="report-text-line">{line}</div>
+              ))}
+            </div>
+        }
+      </div>
+      <hr className="report-divider" />
       <div className="reports-controls">
         <select
           value={selectedQuarter}
