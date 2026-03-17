@@ -13,6 +13,7 @@ import ContentTable from './ContentTable';
 import ContentUrlFetcher from './ContentUrlFetcher';
 import ActivityTable from './ActivityTable';
 import DupeReviewModal from './DupeReviewModal';
+import LinkedInImportModal from './LinkedInImportModal';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
 import { findDuplicate, findDuplicates } from './dupeUtils';
@@ -33,6 +34,7 @@ function App() {
   const [quickFilterText, setQuickFilterText] = useState('');
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
+  const [showLinkedInImport, setShowLinkedInImport] = useState(false);
 
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
@@ -55,6 +57,8 @@ function App() {
         setLookupSearch('');
         return;
       }
+      // Alt+I: LinkedIn import
+      if (e.key === 'i') { e.preventDefault(); setShowLinkedInImport(true); return; }
       // Direct tab shortcuts
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
       if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
@@ -276,7 +280,15 @@ function App() {
             />
           </div>
           <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
-            <ContactForm onSave={handleCreateContact} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <ContactForm onSave={handleCreateContact} />
+              <button
+                onClick={() => setShowLinkedInImport(true)}
+                style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                LinkedIn Import
+              </button>
+            </div>
             <ContactTable
               ref={contactTableRef}
               contacts={contacts}
@@ -349,6 +361,12 @@ function App() {
               />
             </div>
           </div>
+        )}
+        {showLinkedInImport && (
+          <LinkedInImportModal
+            onSave={handleCreateContact}
+            onClose={() => setShowLinkedInImport(false)}
+          />
         )}
         {dupeReviewQueue.length > 0 && (
           <DupeReviewModal

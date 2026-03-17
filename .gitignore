@@ -95,6 +95,12 @@ web_modules/
 
 # dotenv environment variable files
 .env
+.env.backup
+adept-array-490513-k9-*.json
+google-cloud-sdk/
+google-cloud-cli-*.tar.gz
+backup.log
+*.png
 .env.development.local
 .env.test.local
 .env.production.local

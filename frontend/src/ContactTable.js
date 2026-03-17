@@ -153,7 +153,24 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
           columnGroupShow: 'open',
           valueParser: (params) => params.newValue === '' || params.newValue == null ? null : Number(params.newValue),
         },
-        { field: 'created_date', headerName: 'Created', width: 110, editable: false, filter: 'agDateColumnFilter', columnGroupShow: 'open' },
+        {
+          field: 'created_date',
+          headerName: 'Created',
+          width: 110,
+          editable: false,
+          filter: 'agDateColumnFilter',
+          columnGroupShow: 'open',
+          valueFormatter: (params) => params.value ? params.value.slice(0, 10) : '',
+          filterParams: {
+            comparator: (filterDate, cellValue) => {
+              if (!cellValue) return -1;
+              const cell = new Date(cellValue.slice(0, 10));
+              if (cell < filterDate) return -1;
+              if (cell > filterDate) return 1;
+              return 0;
+            }
+          },
+        },
       ],
     },
   ], []);

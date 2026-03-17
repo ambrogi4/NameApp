@@ -2,7 +2,7 @@ import os
 import io
 import re
 import json
-from datetime import date
+from datetime import date, datetime
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -31,7 +31,7 @@ VALID_CONTENT_TYPES = {'pdf', 'youtube', 'article', 'podcast', 'webinar'}
 
 class Contact(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_date = db.Column(db.Date, default=date.today)
+    created_date = db.Column(db.DateTime, default=datetime.now)
     first = db.Column(db.Text, nullable=False)
     last = db.Column(db.Text, nullable=False)
     title = db.Column(db.Text)
@@ -121,6 +121,7 @@ class Activity(db.Model):
     topic = db.Column(db.Text)
     comment = db.Column(db.Text)
     in_crm = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
     content = db.relationship('Content', backref='activities')
 
@@ -136,6 +137,7 @@ class Activity(db.Model):
             'topic': self.topic,
             'comment': self.comment,
             'in_crm': self.in_crm,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
 
@@ -497,6 +499,63 @@ def call_claude(url, url_type, metadata, body_text):
         text = re.sub(r'^```(?:json)?\s*', '', text)
         text = re.sub(r'\s*```$', '', text)
     return json.loads(text)
+
+
+@app.route('/api/contacts/parse-linkedin', methods=['POST'])
+def parse_linkedin_profile():
+    data = request.get_json()
+    text = (data or {}).get('text', '').strip()
+    if not text:
+        return jsonify({'error': 'Profile text is required'}), 400
+
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'ANTHROPIC_API_KEY not set'}), 500
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    system_prompt = (
+        'You extract structured contact info from LinkedIn profile text. '
+        'Return ONLY valid JSON with exactly these fields:\n'
+        '- "first": first name\n'
+        '- "last": last name\n'
+        '- "title": job title from the EXPERIENCE section (most recent role), '
+        'NOT the banner/headline at the top of the profile which tends to be wordy\n'
+        '- "firm": company name from the same Experience entry '
+        '(empty string if unemployed, self-employed, or unclear)\n'
+        '- "city": city from location info (empty string if unknown)\n'
+        '- "state": US state abbreviation from location info (empty string if unknown or non-US)\n'
+        '- "education": university name only (undergraduate institution preferred), '
+        'no degree or major details; if multiple schools, pick the undergrad; '
+        'empty string if not listed\n'
+        'No markdown, no explanation, just the JSON object.'
+    )
+
+    try:
+        response = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=300,
+            system=system_prompt,
+            messages=[{'role': 'user', 'content': f'LinkedIn profile text:\n{text[:12000]}'}],
+        )
+        result_text = response.content[0].text.strip()
+        if result_text.startswith('```'):
+            result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+            result_text = re.sub(r'\s*```$', '', result_text)
+        result = json.loads(result_text)
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Failed to parse LLM response as JSON'}), 500
+    except anthropic.APITimeoutError:
+        return jsonify({'error': 'Claude API timed out'}), 504
+    except anthropic.APIError as e:
+        return jsonify({'error': f'Claude API error: {e}'}), 502
+
+    # Ensure all expected fields exist
+    for field in ['first', 'last', 'title', 'firm', 'city', 'state', 'education']:
+        if field not in result:
+            result[field] = ''
+
+    return jsonify(result)
 
 
 @app.route('/api/content/fetch-url', methods=['POST'])

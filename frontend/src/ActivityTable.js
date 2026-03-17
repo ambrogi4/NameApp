@@ -240,7 +240,20 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: { values: CHANNELS },
     },
-    { field: 'activity_date', headerName: 'Date', width: 110, editable: true, cellEditor: 'agDateStringCellEditor' },
+    {
+      field: 'activity_date',
+      headerName: 'Date',
+      width: 110,
+      editable: true,
+      cellEditor: 'agDateStringCellEditor',
+      comparator: (valueA, valueB, nodeA, nodeB) => {
+        const dateCmp = (valueA || '').localeCompare(valueB || '');
+        if (dateCmp !== 0) return dateCmp;
+        const caA = nodeA.data.created_at || '';
+        const caB = nodeB.data.created_at || '';
+        return caA.localeCompare(caB);
+      },
+    },
     { field: 'topic', width: 180, editable: true },
     { field: 'comment', width: 180, editable: true },
     {

@@ -41,6 +41,16 @@ export const createContact = (data) => apiPost('/contacts', data);
 export const updateContact = (id, data) => apiPut(`/contacts/${id}`, data);
 export const deleteContact = (id) => apiDelete(`/contacts/${id}`);
 export const createContactsBatch = (dataArray) => apiPost('/contacts/batch', dataArray);
+export const parseLinkedInProfile = async (text) => {
+  const res = await fetch(`${API_URL}/contacts/parse-linkedin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+};
 
 // Content
 export const fetchContent = () => apiGet('/content');
