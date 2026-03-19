@@ -14,6 +14,8 @@ import ContentUrlFetcher from './ContentUrlFetcher';
 import ActivityTable from './ActivityTable';
 import DupeReviewModal from './DupeReviewModal';
 import LinkedInImportModal from './LinkedInImportModal';
+import LinkedInUpdateModal from './LinkedInUpdateModal';
+import ConferenceImportModal from './ConferenceImportModal';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
 import { findDuplicate, findDuplicates } from './dupeUtils';
@@ -35,6 +37,8 @@ function App() {
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
   const [showLinkedInImport, setShowLinkedInImport] = useState(false);
+  const [showConferenceImport, setShowConferenceImport] = useState(false);
+  const [linkedInUpdateContact, setLinkedInUpdateContact] = useState(null);
 
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
@@ -59,6 +63,8 @@ function App() {
       }
       // Alt+I: LinkedIn import
       if (e.key === 'i') { e.preventDefault(); setShowLinkedInImport(true); return; }
+      // Alt+K: Conference import
+      if (e.key === 'k') { e.preventDefault(); setShowConferenceImport(true); return; }
       // Direct tab shortcuts
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
       if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
@@ -288,6 +294,12 @@ function App() {
               >
                 LinkedIn Import
               </button>
+              <button
+                onClick={() => setShowConferenceImport(true)}
+                style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Conference Import
+              </button>
             </div>
             <ContactTable
               ref={contactTableRef}
@@ -297,6 +309,7 @@ function App() {
               onPasteRows={handlePasteContacts}
               onDeleteBatch={handleDeleteContactsBatch}
               onNewActivity={handleNewActivityForContact}
+              onLinkedInUpdate={(contact) => setLinkedInUpdateContact(contact)}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -366,6 +379,19 @@ function App() {
           <LinkedInImportModal
             onSave={handleCreateContact}
             onClose={() => setShowLinkedInImport(false)}
+          />
+        )}
+        {showConferenceImport && (
+          <ConferenceImportModal
+            onImport={handlePasteContacts}
+            onClose={() => setShowConferenceImport(false)}
+          />
+        )}
+        {linkedInUpdateContact && (
+          <LinkedInUpdateModal
+            contact={linkedInUpdateContact}
+            onUpdate={handleUpdateContact}
+            onClose={() => setLinkedInUpdateContact(null)}
           />
         )}
         {dupeReviewQueue.length > 0 && (

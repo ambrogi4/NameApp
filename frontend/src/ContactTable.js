@@ -5,7 +5,7 @@ import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
-const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, quickFilterText, lookupMode, onDismiss }, ref) {
+const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, quickFilterText, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -24,6 +24,8 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
   onNewActivityRef.current = onNewActivity;
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
+  const onLinkedInUpdateRef = useRef(onLinkedInUpdate);
+  onLinkedInUpdateRef.current = onLinkedInUpdate;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -300,6 +302,18 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
             const left = window.screenX + 100;
             const top = window.screenY + 100;
             window.open(`https://www.google.com/search?q=${query}`, 'linkedinSearch', `popup=yes,width=1200,height=800,left=${left},top=${top}`);
+          }
+        }
+      }
+
+      // Alt+D: open LinkedIn update modal for focused contact
+      if (e.altKey && e.key === 'd') {
+        e.preventDefault();
+        const cell = gridRef.current?.api?.getFocusedCell();
+        if (cell) {
+          const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode && !rowNode.rowPinned && onLinkedInUpdateRef.current) {
+            onLinkedInUpdateRef.current(rowNode.data);
           }
         }
       }

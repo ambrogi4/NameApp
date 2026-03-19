@@ -558,6 +558,60 @@ def parse_linkedin_profile():
     return jsonify(result)
 
 
+@app.route('/api/contacts/parse-conference', methods=['POST'])
+def parse_conference_speakers():
+    data = request.get_json()
+    text = (data or {}).get('text', '').strip()
+    if not text:
+        return jsonify({'error': 'Conference text is required'}), 400
+
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'ANTHROPIC_API_KEY not set'}), 500
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    system_prompt = (
+        'You extract structured speaker information from conference web page text. '
+        'The text is a raw copy-paste from a conference website listing speakers. '
+        'Return ONLY a valid JSON array of objects, one per speaker, with these fields:\n'
+        '- "first": first name\n'
+        '- "last": last name\n'
+        '- "title": job title (empty string if not listed)\n'
+        '- "firm": company/organization (empty string if not listed)\n'
+        'Ignore non-speaker content like navigation, footers, sponsor logos, session descriptions. '
+        'If a person has multiple roles listed, use the most prominent/current one. '
+        'No markdown, no explanation, just the JSON array.'
+    )
+
+    try:
+        response = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{'role': 'user', 'content': f'Conference page text:\n{text[:30000]}'}],
+        )
+        result_text = response.content[0].text.strip()
+        if result_text.startswith('```'):
+            result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+            result_text = re.sub(r'\s*```$', '', result_text)
+        speakers = json.loads(result_text)
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Failed to parse LLM response as JSON'}), 500
+    except anthropic.APITimeoutError:
+        return jsonify({'error': 'Claude API timed out'}), 504
+    except anthropic.APIError as e:
+        return jsonify({'error': f'Claude API error: {e}'}), 502
+
+    # Ensure all expected fields exist in each speaker
+    for speaker in speakers:
+        for field in ['first', 'last', 'title', 'firm']:
+            if field not in speaker:
+                speaker[field] = ''
+
+    return jsonify({'speakers': speakers})
+
+
 @app.route('/api/content/fetch-url', methods=['POST'])
 def fetch_url_content():
     data = request.get_json()

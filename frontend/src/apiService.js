@@ -52,6 +52,17 @@ export const parseLinkedInProfile = async (text) => {
   return data;
 };
 
+export const parseConferenceSpeakers = async (text) => {
+  const res = await fetch(`${API_URL}/contacts/parse-conference`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data.speakers;
+};
+
 // Content
 export const fetchContent = () => apiGet('/content');
 export const createContent = (data) => apiPost('/content', data);
