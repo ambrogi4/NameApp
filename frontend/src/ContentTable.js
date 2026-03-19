@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, u
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
 const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent, onCreateContent, onDeleteBatch, onNewActivity, quickFilterText, lookupMode }, ref) {
@@ -96,7 +97,7 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
-    filter: 'agTextColumnFilter',
+    filter: SetFilter,
     resizable: true,
   }), []);
 

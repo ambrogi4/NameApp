@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
 import SelectCellEditor from './SelectCellEditor';
+import SetFilter from './SetFilter';
 
 const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, content, onUpdateActivity, onCreateActivity, onDeleteBatch, prefillContactId, prefillContentId, onClearPrefill, lookupMode, onDismiss, quickFilterText }, ref) {
   const gridRef = useRef(null);
@@ -281,7 +282,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
-    filter: 'agTextColumnFilter',
+    filter: SetFilter,
     resizable: true,
   }), []);
 

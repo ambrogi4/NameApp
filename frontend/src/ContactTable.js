@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, u
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
 import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
 const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, quickFilterText, lookupMode, onDismiss }, ref) {
@@ -177,7 +178,7 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
-    filter: 'agTextColumnFilter',
+    filter: SetFilter,
     resizable: true,
   }), []);
 
@@ -308,7 +309,9 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
             const d = rowNode.data;
             const terms = [d.first, d.last, d.title, d.firm, 'linkedin'].filter(Boolean);
             const query = encodeURIComponent(terms.join(' '));
-            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+            const left = window.screenX + 100;
+            const top = window.screenY + 100;
+            window.open(`https://www.google.com/search?q=${query}`, 'linkedinSearch', `popup=yes,width=1200,height=800,left=${left},top=${top}`);
           }
         }
       }
