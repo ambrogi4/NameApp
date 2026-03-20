@@ -48,6 +48,56 @@ services:
       - INSTANCE_NAME=myCRM Charity
       - INSTANCE_COLOR=#87CEEB
 
+  db_atc:
+    image: postgres:13
+    volumes:
+      - postgres_atc:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=nameapp_atc
+
+  backend_atc:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5002:5000"
+    depends_on:
+      - db_atc
+    environment:
+      - DATABASE_URL=postgresql://user:password@db_atc:5432/nameapp_atc
+      - FLASK_APP=app.py
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - INSTANCE_NAME=myCRM ATC
+      - INSTANCE_COLOR=#9C27B0
+
+  db_test:
+    image: postgres:13
+    volumes:
+      - postgres_test:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=nameapp_test
+
+  backend_test:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5003:5000"
+    depends_on:
+      - db_test
+    environment:
+      - DATABASE_URL=postgresql://user:password@db_test:5432/nameapp_test
+      - FLASK_APP=app.py
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - INSTANCE_NAME=myCRM Test
+      - INSTANCE_COLOR=#4CAF50
+
 volumes:
   postgres_work:
   postgres_charity:
+  postgres_atc:
+  postgres_test:
