@@ -24,8 +24,14 @@ export default function LinkedInImportModal({ onSave, onClose }) {
     textareaRef.current?.focus();
   }, []);
 
+  const wasParsedRef = useRef(false);
   useEffect(() => {
-    if (parsed) firstFieldRef.current?.focus();
+    if (parsed && !wasParsedRef.current) {
+      wasParsedRef.current = true;
+      firstFieldRef.current?.focus();
+    } else if (!parsed) {
+      wasParsedRef.current = false;
+    }
   }, [parsed]);
 
   const handleProcess = async () => {
