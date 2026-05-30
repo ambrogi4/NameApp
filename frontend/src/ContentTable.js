@@ -148,13 +148,13 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [lookupMode]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (use window to capture events even when AG Grid cells have focus)
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // Only handle if this grid's container is visible/active
+      if (!containerRef.current?.offsetParent) return;
 
       // Ctrl+C: copy selected/focused rows to clipboard
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
@@ -229,8 +229,8 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
         }
       }
     };
-    el.addEventListener('keydown', handleKeyDown);
-    return () => el.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedRows]);
 
   return (

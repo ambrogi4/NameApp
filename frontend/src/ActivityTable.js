@@ -60,11 +60,12 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
     }
   }, [prefillContentId, focusPinnedContent]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (use window to capture events even when AG Grid cells have focus)
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
     const handleKeyDown = (e) => {
+      // Only handle if this grid's container is visible/active
+      if (!containerRef.current?.offsetParent) return;
+
       // Ctrl+Enter: save new row
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
@@ -171,8 +172,8 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         gridRef.current?.api?.deselectAll();
       }
     };
-    el.addEventListener('keydown', handleKeyDown);
-    return () => el.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusPinnedContact, selectedRows]);
 
   const handleSaveNewRef = useRef(null);
