@@ -74,22 +74,64 @@ export function copyRowsToClipboard(api) {
   );
 
   const text = [headers.join('\t'), ...rows].join('\n');
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+
+  // navigator.clipboard requires secure context (HTTPS or localhost)
+  // On HTTP (e.g., Tailscale IP access), this will fail
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => showCopyFeedback(true, rows.length))
+      .catch(() => fallbackCopy(text, rows.length));
   } else {
-    fallbackCopy(text);
+    fallbackCopy(text, rows.length);
   }
 }
 
-function fallbackCopy(text) {
+function fallbackCopy(text, rowCount) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
   ta.style.opacity = '0';
   document.body.appendChild(ta);
+  ta.focus();
   ta.select();
-  document.execCommand('copy');
+
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (e) {
+    success = false;
+  }
   document.body.removeChild(ta);
+  showCopyFeedback(success, rowCount);
+}
+
+function showCopyFeedback(success, rowCount) {
+  // Remove any existing feedback
+  const existing = document.getElementById('copy-feedback');
+  if (existing) existing.remove();
+
+  const msg = success
+    ? `Copied ${rowCount} row${rowCount > 1 ? 's' : ''}`
+    : 'Copy failed — use HTTPS for clipboard access';
+
+  const div = document.createElement('div');
+  div.id = 'copy-feedback';
+  div.textContent = msg;
+  div.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 16px;
+    background: ${success ? '#28a745' : '#dc3545'};
+    color: white;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 10000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 2500);
 }
 
 export function isPinnedRow(params) {
