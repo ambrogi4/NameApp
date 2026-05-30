@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
-import { CONTACT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import { CONTACT_FIELDS, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
@@ -193,42 +193,67 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
   const onPasteRowsRef = useRef(onPasteRows);
   onPasteRowsRef.current = onPasteRows;
 
-  // Paste handler — batch mode (disabled in lookup mode)
+  // Paste handler — batch mode (Ctrl+Shift+V only, disabled in lookup mode)
+  const shiftPasteRef = useRef(false);
   useEffect(() => {
     if (lookupMode) return;
     const el = containerRef.current;
     if (!el) return;
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+        shiftPasteRef.current = true;
+      }
+    };
+
     const handlePaste = (e) => {
+      if (!shiftPasteRef.current) return;
+      shiftPasteRef.current = false;
+
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
       const text = e.clipboardData?.getData('text/plain');
       if (!text) return;
 
-      const fields = ['first', 'last', 'title', 'firm', 'source', 'education',
-        'email', 'phone', 'street', 'city', 'state', 'zip', 'country',
-        'li_url', 'photo_url', 'tags', 'comment'];
       const rows = text.split('\n').filter(line => line.trim() !== '');
       if (rows.length === 0) return;
 
       e.preventDefault();
+
+      // Check if first row is a header (all non-empty values are known field names)
+      const positionalFields = ['first', 'last', 'title', 'firm', 'source', 'education',
+        'email', 'phone', 'street', 'city', 'state', 'zip', 'country',
+        'li_url', 'photo_url', 'tags', 'comment'];
+      const firstCols = rows[0].split('\t').map(v => v.trim().toLowerCase());
+      const nonEmpty = firstCols.filter(v => v !== '');
+      const headerMode = nonEmpty.length > 0 && nonEmpty.every(v => CONTACT_FIELDS.includes(v));
+
+      const fields = headerMode ? firstCols : positionalFields;
+      const dataRows = headerMode ? rows.slice(1) : rows;
+
       const parsedRows = [];
-      rows.forEach(row => {
+      dataRows.forEach(row => {
         const cols = row.split('\t');
         const obj = {};
         cols.forEach((val, i) => {
-          if (i < fields.length && val.trim() !== '') obj[fields[i]] = val.trim();
+          if (i < fields.length && fields[i] && val.trim() !== '') obj[fields[i]] = val.trim();
         });
         if (Object.keys(obj).length > 0) {
           parsedRows.push(obj);
         }
       });
       if (parsedRows.length > 0) {
-        onPasteRowsRef.current(parsedRows);
+        onPasteRowsRef.current(parsedRows, headerMode);
       }
     };
+
+    el.addEventListener('keydown', handleKeyDown);
     el.addEventListener('paste', handlePaste);
-    return () => el.removeEventListener('paste', handlePaste);
+    return () => {
+      el.removeEventListener('keydown', handleKeyDown);
+      el.removeEventListener('paste', handlePaste);
+    };
   }, [lookupMode]);
 
   // Keyboard shortcuts
@@ -238,6 +263,16 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Ctrl+C: copy selected/focused rows to clipboard
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const api = gridRef.current?.api;
+        if (api) {
+          e.preventDefault();
+          copyRowsToClipboard(api);
+        }
+        return;
+      }
 
       // Shift+Alt+Left/Right: pagination
       if (e.shiftKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
-import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import { CHANNELS, ACTIVITY_FIELDS, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
 import SelectCellEditor from './SelectCellEditor';
 import SetFilter from './SetFilter';
 
@@ -146,6 +146,16 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
 
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Ctrl+C: copy selected/focused rows to clipboard
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const api = gridRef.current?.api;
+        if (api) {
+          e.preventDefault();
+          copyRowsToClipboard(api);
+        }
+        return;
+      }
 
       if (e.key === 'Escape') {
         e.preventDefault();

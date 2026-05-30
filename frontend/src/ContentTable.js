@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
-import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow } from './gridUtils';
+import { CONTENT_TYPES, CONTENT_FIELDS, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
@@ -155,6 +155,16 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Ctrl+C: copy selected/focused rows to clipboard
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const api = gridRef.current?.api;
+        if (api) {
+          e.preventDefault();
+          copyRowsToClipboard(api);
+        }
+        return;
+      }
 
       // Shift+Alt+Left/Right: pagination
       if (e.shiftKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {

@@ -16,6 +16,7 @@ import DupeReviewModal from './DupeReviewModal';
 import LinkedInImportModal from './LinkedInImportModal';
 import LinkedInUpdateModal from './LinkedInUpdateModal';
 import ConferenceImportModal from './ConferenceImportModal';
+import PasteConfirmBar from './PasteConfirmBar';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
 import { findDuplicate, findDuplicates } from './dupeUtils';
@@ -39,6 +40,8 @@ function App() {
   const [showLinkedInImport, setShowLinkedInImport] = useState(false);
   const [showConferenceImport, setShowConferenceImport] = useState(false);
   const [linkedInUpdateContact, setLinkedInUpdateContact] = useState(null);
+  const [pendingPaste, setPendingPaste] = useState(null);
+  const [lastPasteIds, setLastPasteIds] = useState([]);
 
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
@@ -65,6 +68,8 @@ function App() {
       if (e.key === 'i') { e.preventDefault(); setShowLinkedInImport(true); return; }
       // Alt+K: Conference import
       if (e.key === 'k') { e.preventDefault(); setShowConferenceImport(true); return; }
+      // Alt+X: Clear all filters
+      if (e.key === 'x') { e.preventDefault(); handleClearAllFilters(); return; }
       // Direct tab shortcuts
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
       if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
@@ -83,7 +88,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tab, TAB_ORDER]);
+  }, [tab, TAB_ORDER, handleClearAllFilters]);
 
   useEffect(() => {
     fetchConfig().then(cfg => {
@@ -114,7 +119,50 @@ function App() {
       .catch(console.error);
   };
 
-  const handlePasteContacts = (dataArray) => {
+  // Paste from clipboard — stages data for confirmation
+  const handlePasteContacts = (dataArray, headerMode) => {
+    setLastPasteIds([]);
+    setPendingPaste({ rows: dataArray, headerMode: !!headerMode });
+  };
+
+  // Confirm button on paste bar — runs dupe detection + batch create
+  const handleConfirmPaste = () => {
+    if (!pendingPaste) return;
+    const { newRows, dupes } = findDuplicates(pendingPaste.rows, contacts);
+    if (newRows.length > 0) {
+      createContactsBatch(newRows)
+        .then(created => {
+          setContacts(prev => [...prev, ...created]);
+          setLastPasteIds(created.map(c => c.id));
+        })
+        .catch(console.error);
+    }
+    if (dupes.length > 0) {
+      setDupeReviewQueue(dupes);
+    }
+    setPendingPaste(null);
+  };
+
+  const handleCancelPaste = () => setPendingPaste(null);
+
+  // Undo — delete recently pasted contacts
+  const handleUndoPaste = () => {
+    const ids = lastPasteIds;
+    if (ids.length === 0) return;
+    Promise.all(ids.map(id => deleteContact(id)))
+      .then(() => {
+        const idSet = new Set(ids);
+        setContacts(prev => prev.filter(c => !idSet.has(c.id)));
+        setActivities(prev => prev.filter(a => !idSet.has(a.contact_id)));
+      })
+      .catch(console.error);
+    setLastPasteIds([]);
+  };
+
+  const handleDismissUndo = useCallback(() => setLastPasteIds([]), []);
+
+  // Direct batch create — used by ConferenceImportModal (no confirmation needed)
+  const handleDirectBatchCreate = (dataArray) => {
     const { newRows, dupes } = findDuplicates(dataArray, contacts);
     if (newRows.length > 0) {
       createContactsBatch(newRows)
@@ -261,7 +309,7 @@ function App() {
                 onChange={(e) => setQuickFilterText(e.target.value)}
               />
             )}
-            <button className="clear-filters-btn" onClick={handleClearAllFilters} title="Clear all filters and search">
+            <button className="clear-filters-btn" onClick={handleClearAllFilters} title="Clear all filters and search (Alt+X)">
               Clear Filters
             </button>
             {tab === 'contacts' && (
@@ -383,7 +431,7 @@ function App() {
         )}
         {showConferenceImport && (
           <ConferenceImportModal
-            onImport={handlePasteContacts}
+            onImport={handleDirectBatchCreate}
             onClose={() => setShowConferenceImport(false)}
           />
         )}
@@ -403,6 +451,14 @@ function App() {
             onClose={() => setDupeReviewQueue([])}
           />
         )}
+        <PasteConfirmBar
+          pendingPaste={pendingPaste}
+          lastPasteCount={lastPasteIds.length}
+          onConfirm={handleConfirmPaste}
+          onCancel={handleCancelPaste}
+          onUndo={handleUndoPaste}
+          onDismissUndo={handleDismissUndo}
+        />
       </div>
     </AgGridProvider>
   );
