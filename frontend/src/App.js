@@ -19,8 +19,9 @@ import ConferenceImportModal from './ConferenceImportModal';
 import PasteConfirmBar from './PasteConfirmBar';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
+import AppMenu from './AppMenu';
 import { findDuplicate, findDuplicates } from './dupeUtils';
-import { confirmBulkDelete } from './gridUtils';
+import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
 import './App.css';
 
 function App() {
@@ -270,6 +271,49 @@ function App() {
     setLookupSearch('');
   }, []);
 
+  // Menu action callbacks
+  const handleMenuGlobalLookup = useCallback(() => {
+    setShowLookup(true);
+    setLookupSearch('');
+  }, []);
+
+  const handleMenuLinkedInSearch = useCallback(() => {
+    contactTableRef.current?.triggerLinkedInSearch?.();
+  }, []);
+
+  const handleMenuLinkedInUpdate = useCallback(() => {
+    contactTableRef.current?.triggerLinkedInUpdate?.();
+  }, []);
+
+  const handleMenuOpenUrl = useCallback(() => {
+    if (tab === 'contacts') contactTableRef.current?.triggerOpenUrl?.();
+    else if (tab === 'content') contentTableRef.current?.triggerOpenUrl?.();
+  }, [tab]);
+
+  const handleMenuPaste = useCallback(() => {
+    contactTableRef.current?.triggerPaste?.();
+  }, []);
+
+  const handleMenuCopy = useCallback(() => {
+    let api = null;
+    if (tab === 'contacts') api = contactTableRef.current?.getApi?.();
+    else if (tab === 'activities') api = activityTableRef.current?.getApi?.();
+    else if (tab === 'content') api = contentTableRef.current?.getApi?.();
+    if (api) copyRowsToClipboard(api);
+  }, [tab]);
+
+  const handleMenuPageForward = useCallback(() => {
+    if (tab === 'contacts') contactTableRef.current?.pageForward?.();
+    else if (tab === 'activities') activityTableRef.current?.pageForward?.();
+    else if (tab === 'content') contentTableRef.current?.pageForward?.();
+  }, [tab]);
+
+  const handleMenuPageBackward = useCallback(() => {
+    if (tab === 'contacts') contactTableRef.current?.pageBackward?.();
+    else if (tab === 'activities') activityTableRef.current?.pageBackward?.();
+    else if (tab === 'content') contentTableRef.current?.pageBackward?.();
+  }, [tab]);
+
   const handleDeleteActivity = (id) => {
     if (!window.confirm('Delete this activity?')) return;
     deleteActivity(id)
@@ -299,6 +343,21 @@ function App() {
             <button className={tab === 'filter' ? 'tab active' : 'tab'} onClick={() => setTab('filter')}>Filter</button>
             <button className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>Reports</button>
           </div>
+          <AppMenu
+            tab={tab}
+            onNavigate={setTab}
+            onGlobalLookup={handleMenuGlobalLookup}
+            onLinkedInSearch={handleMenuLinkedInSearch}
+            onOpenUrl={handleMenuOpenUrl}
+            onClearFilters={handleClearAllFilters}
+            onLinkedInImport={() => setShowLinkedInImport(true)}
+            onConferenceImport={() => setShowConferenceImport(true)}
+            onLinkedInUpdate={handleMenuLinkedInUpdate}
+            onPaste={handleMenuPaste}
+            onCopy={handleMenuCopy}
+            onPageForward={handleMenuPageForward}
+            onPageBackward={handleMenuPageBackward}
+          />
           <div className="app-bar-right">
             {(tab === 'contacts' || tab === 'activities' || tab === 'content') && (
               <input

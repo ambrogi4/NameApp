@@ -13,6 +13,21 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       const api = gridRef.current?.api;
       if (api) api.setFilterModel(null);
     },
+    getApi: () => gridRef.current?.api,
+    pageForward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToNextPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'contact_id', null), 50);
+      }
+    },
+    pageBackward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToPreviousPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'contact_id', null), 50);
+      }
+    },
   }));
   const [newRow, setNewRow] = useState(createEmptyRow(ACTIVITY_FIELDS));
   const newRowRef = useRef(newRow);

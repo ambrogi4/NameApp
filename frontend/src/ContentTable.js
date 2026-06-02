@@ -13,6 +13,39 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
       const api = gridRef.current?.api;
       if (api) api.setFilterModel(null);
     },
+    getApi: () => gridRef.current?.api,
+    pageForward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToNextPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'short_name', null), 50);
+      }
+    },
+    pageBackward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToPreviousPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'short_name', null), 50);
+      }
+    },
+    triggerOpenUrl: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        const cell = api.getFocusedCell();
+        if (cell && !cell.rowPinned) {
+          const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode) {
+            const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+            const val = rowNode.data[colId];
+            if (typeof val === 'string' && val.trim()) {
+              let url = val.trim();
+              if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+              window.open(url, '_blank');
+            }
+          }
+        }
+      }
+    },
   }));
   const [newRow, setNewRow] = useState(createEmptyRow(CONTENT_FIELDS));
   const newRowRef = useRef(newRow);

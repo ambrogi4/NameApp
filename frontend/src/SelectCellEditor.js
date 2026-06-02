@@ -19,11 +19,29 @@ export default function SelectCellEditor({ value, onValueChange, options, numeri
     onValueChange(v);
   };
 
+  // Letter-key selection: pressing a letter selects the first option starting with that letter
+  const handleKeyDown = (e) => {
+    const key = e.key.toLowerCase();
+    if (key.length === 1 && /[a-z]/.test(key)) {
+      const match = options.find(o =>
+        (o.label || o.value).toString().toLowerCase().startsWith(key)
+      );
+      if (match) {
+        e.preventDefault();
+        let v = match.value;
+        if (numeric) v = Number(v);
+        setVal(v);
+        onValueChange(v);
+      }
+    }
+  };
+
   return (
     <select
       ref={ref}
       value={val ?? ''}
       onChange={handleChange}
+      onKeyDown={handleKeyDown}
       style={{ width: '100%', height: '100%', border: 'none' }}
     >
       {allowNull && <option value="">-- none --</option>}

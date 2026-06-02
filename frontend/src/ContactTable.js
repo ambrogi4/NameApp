@@ -13,6 +13,66 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       const api = gridRef.current?.api;
       if (api) api.setFilterModel(null);
     },
+    getApi: () => gridRef.current?.api,
+    pageForward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToNextPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'first', null), 50);
+      }
+    },
+    pageBackward: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.paginationGoToPreviousPage();
+        setTimeout(() => api.setFocusedCell(api.getFirstDisplayedRowIndex(), 'first', null), 50);
+      }
+    },
+    triggerLinkedInSearch: () => {
+      const cell = gridRef.current?.api?.getFocusedCell();
+      if (cell) {
+        const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+        if (rowNode && !rowNode.rowPinned) {
+          const d = rowNode.data;
+          const terms = [d.first, d.last, d.title, d.firm, 'linkedin'].filter(Boolean);
+          const query = encodeURIComponent(terms.join(' '));
+          const left = window.screenX + 100;
+          const top = window.screenY + 100;
+          window.open(`https://www.google.com/search?q=${query}`, 'linkedinSearch', `popup=yes,width=1200,height=800,left=${left},top=${top}`);
+        }
+      }
+    },
+    triggerOpenUrl: () => {
+      const api = gridRef.current?.api;
+      if (api) {
+        const cell = api.getFocusedCell();
+        if (cell && !cell.rowPinned) {
+          const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode) {
+            const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+            const val = rowNode.data[colId];
+            if (typeof val === 'string' && val.trim()) {
+              let url = val.trim();
+              if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+              window.open(url, '_blank');
+            }
+          }
+        }
+      }
+    },
+    triggerPaste: () => {
+      // Focus the container to ensure paste event can be captured
+      containerRef.current?.focus();
+    },
+    triggerLinkedInUpdate: () => {
+      const cell = gridRef.current?.api?.getFocusedCell();
+      if (cell) {
+        const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+        if (rowNode && !rowNode.rowPinned && onLinkedInUpdateRef.current) {
+          onLinkedInUpdateRef.current(rowNode.data);
+        }
+      }
+    },
   }));
 
   const [newRow, setNewRow] = useState(createEmptyRow(CONTACT_FIELDS));
