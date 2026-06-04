@@ -11,10 +11,18 @@ const FIELDS = [
   { key: 'education', label: 'Education' },
 ];
 
+// Fields shown after LinkedIn URL - these are user-entered, not parsed
+const EXTRA_FIELDS = [
+  { key: 'tags', label: 'Tags' },
+  { key: 'comment', label: 'Comment' },
+  { key: 'email', label: 'Email' },
+];
+
 export default function LinkedInImportModal({ onSave, onClose }) {
   const [profileText, setProfileText] = useState('');
   const [profileUrl, setProfileUrl] = useState('');
   const [parsed, setParsed] = useState(null);
+  const [extraFields, setExtraFields] = useState({ tags: '', comment: '', email: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
@@ -52,6 +60,10 @@ export default function LinkedInImportModal({ onSave, onClose }) {
     setParsed(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleExtraFieldChange = (key, value) => {
+    setExtraFields(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleSave = () => {
     const data = { ...parsed };
     if (profileUrl.trim()) {
@@ -59,6 +71,12 @@ export default function LinkedInImportModal({ onSave, onClose }) {
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
       data.li_url = url;
     }
+    // Add extra fields if they have values
+    EXTRA_FIELDS.forEach(f => {
+      if (extraFields[f.key]?.trim()) {
+        data[f.key] = extraFields[f.key].trim();
+      }
+    });
     onSave(data);
     onClose();
   };
@@ -137,6 +155,19 @@ export default function LinkedInImportModal({ onSave, onClose }) {
                     <td style={{ padding: '4px 0', fontSize: 13, color: '#555' }}>{profileUrl.trim()}</td>
                   </tr>
                 )}
+                {EXTRA_FIELDS.map(f => (
+                  <tr key={f.key}>
+                    <td style={{ padding: '4px 8px 4px 0', fontWeight: 600, width: 80, verticalAlign: 'middle' }}>{f.label}</td>
+                    <td style={{ padding: '4px 0' }}>
+                      <input
+                        type="text"
+                        value={extraFields[f.key]}
+                        onChange={(e) => handleExtraFieldChange(f.key, e.target.value)}
+                        style={{ width: '100%', padding: 5, fontSize: 13, boxSizing: 'border-box' }}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             {error && <div style={{ color: '#c62828', marginTop: 8, fontSize: 13 }}>{error}</div>}
