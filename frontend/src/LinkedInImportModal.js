@@ -13,6 +13,7 @@ const FIELDS = [
 
 // Fields shown after LinkedIn URL - these are user-entered, not parsed
 const EXTRA_FIELDS = [
+  { key: 'source', label: 'Source' },
   { key: 'tags', label: 'Tags' },
   { key: 'comment', label: 'Comment' },
   { key: 'email', label: 'Email' },
@@ -22,7 +23,7 @@ export default function LinkedInImportModal({ onSave, onClose }) {
   const [profileText, setProfileText] = useState('');
   const [profileUrl, setProfileUrl] = useState('');
   const [parsed, setParsed] = useState(null);
-  const [extraFields, setExtraFields] = useState({ tags: '', comment: '', email: '' });
+  const [extraFields, setExtraFields] = useState({ source: '', tags: '', comment: '', email: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
