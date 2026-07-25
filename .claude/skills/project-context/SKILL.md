@@ -20,7 +20,7 @@ Frontend (React 19 + AG Grid v35) → Flask API (/api/*) → PostgreSQL 13
                                    ↘ Static files (/)
 ```
 
-- **Backend**: Flask 3.0 with SQLAlchemy ORM (`backend/app.py`)
+- **Backend**: Flask 3.0 with SQLAlchemy ORM (modular: `backend/app.py`, `models.py`, `routes/`, `services/`)
 - **Frontend**: React 19 with AG Grid Community v35 (`frontend/src/`)
 - **Database**: PostgreSQL 13 (via Docker Compose)
 - **AI**: Anthropic Claude Haiku 4.5 for parsing LinkedIn profiles, conference pages, and URLs
@@ -104,7 +104,15 @@ All prefixed with `/api`.
 ### Backend
 | File | Purpose |
 |------|---------|
-| `backend/app.py` | Flask app: models, all API routes, static serving, LLM integration |
+| `backend/app.py` | Flask app factory, config, static serving (~70 lines) |
+| `backend/extensions.py` | db, migrate instances (breaks circular imports) |
+| `backend/models.py` | Contact, Content, Activity SQLAlchemy models |
+| `backend/routes/__init__.py` | Blueprint registration |
+| `backend/routes/contacts.py` | Contact CRUD + parse-linkedin + parse-conference |
+| `backend/routes/content.py` | Content CRUD + fetch-url |
+| `backend/routes/activities.py` | Activity CRUD |
+| `backend/routes/query.py` | Natural language query endpoint |
+| `backend/services/llm.py` | Shared Claude API helpers, JSON parsing, enums |
 | `backend/Dockerfile` | Multi-stage: node builds frontend, python serves everything |
 | `backend/requirements.txt` | Flask, SQLAlchemy, Flask-Cors, Flask-Migrate, anthropic, beautifulsoup4, pypdf |
 | `backend/migrations/` | Alembic migrations (baseline + timestamps) |
@@ -184,8 +192,9 @@ All prefixed with `/api`.
 - All functions: `apiGet`, `apiPost`, `apiPut`, `apiDelete` with `response.ok` checking
 
 ### Deployment
-- `docker-compose build backend && docker-compose down && docker-compose up -d`
-- Must `down` before `up` after rebuild (docker-compose v1.29.2 `ContainerConfig` bug)
+- `docker-compose build backend_work && docker-compose stop backend_work && docker-compose rm -f backend_work && docker-compose up -d backend_work`
+- Service names: `backend_work`, `backend_charity`, `backend_atc`, `backend_test`
+- Must stop + rm before up after rebuild (docker-compose v1.29.2 `ContainerConfig` bug)
 - Env vars per instance: `INSTANCE_NAME`, `INSTANCE_COLOR`, `DATABASE_URL`, `ANTHROPIC_API_KEY`
 
 ## Dependencies
