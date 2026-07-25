@@ -133,7 +133,7 @@ function passesCondition(raw, condition) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SetFilter({ model: rawModel, onModelChange, api, getValue }) {
+export default function SetFilter({ model: rawModel, onModelChange, api, getValue, colDef }) {
   const model = migrateModel(rawModel);
   const [search, setSearch] = useState('');
   const searchRef = useRef(null);
@@ -147,9 +147,25 @@ export default function SetFilter({ model: rawModel, onModelChange, api, getValu
 
   const dataType = detectDataType(rawValues);
 
-  const strValues = Array.from(
+  // Get display formatter from filterParams if provided (for FK columns like contact_id, content_id)
+  const displayFormatter = colDef?.filterParams?.displayFormatter;
+
+  // Build unique values with optional display labels
+  const uniqueRaw = Array.from(
     new Set(rawValues.filter(v => v != null && String(v).trim() !== '').map(v => String(v).trim()))
-  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  );
+
+  // Map raw values to { raw, display } objects
+  const valueItems = uniqueRaw.map(v => ({
+    raw: v,
+    display: displayFormatter ? displayFormatter(v) : v,
+  })).sort((a, b) => a.display.localeCompare(b.display, undefined, { sensitivity: 'base' }));
+
+  // For backwards compatibility, strValues is the list of raw string values (sorted by display)
+  const strValues = valueItems.map(item => item.raw);
+
+  // Map raw -> display for rendering
+  const rawToDisplay = Object.fromEntries(valueItems.map(item => [item.raw, item.display]));
 
   const hasBlanks = rawValues.some(v => v == null || String(v).trim() === '');
 
@@ -204,7 +220,7 @@ export default function SetFilter({ model: rawModel, onModelChange, api, getValu
   const selected = isValuesActive ? new Set(model.values) : null;
 
   const filteredValues = search
-    ? strValues.filter(v => v.toLowerCase().includes(search.toLowerCase()))
+    ? strValues.filter(v => (rawToDisplay[v] || v).toLowerCase().includes(search.toLowerCase()))
     : strValues;
 
   const blanksLabel = '(Blanks)';
@@ -243,6 +259,8 @@ export default function SetFilter({ model: rawModel, onModelChange, api, getValu
 
   const displayVal = (v) => {
     if (dataType === 'boolean') return v === 'true' ? 'Yes' : v === 'false' ? 'No' : v;
+    // Use mapped display value if available (for FK columns)
+    if (rawToDisplay[v]) return rawToDisplay[v];
     return v;
   };
 
@@ -305,17 +323,6 @@ export default function SetFilter({ model: rawModel, onModelChange, api, getValu
         style={{ ...inp, marginBottom: 4 }}
       />
       <div style={{ overflowY: 'auto', flex: 1 }}>
-        {filteredValues.map(val => (
-          <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '1px 0', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={!isValuesActive || selected.has(val)}
-              onChange={() => toggleValue(val)}
-              style={{ margin: 0 }}
-            />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayVal(val)}</span>
-          </label>
-        ))}
         {hasBlanks && blanksVisible && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '1px 0', cursor: 'pointer', fontStyle: 'italic', color: '#888' }}>
             <input
@@ -327,6 +334,17 @@ export default function SetFilter({ model: rawModel, onModelChange, api, getValu
             <span>{blanksLabel}</span>
           </label>
         )}
+        {filteredValues.map(val => (
+          <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '1px 0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={!isValuesActive || selected.has(val)}
+              onChange={() => toggleValue(val)}
+              style={{ margin: 0 }}
+            />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayVal(val)}</span>
+          </label>
+        ))}
       </div>
 
     </div>

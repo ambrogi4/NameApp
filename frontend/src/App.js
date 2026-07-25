@@ -47,6 +47,7 @@ function App() {
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
   const contentTableRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   const handleClearAllFilters = useCallback(() => {
     setQuickFilterText('');
@@ -69,6 +70,8 @@ function App() {
       if (e.key === 'i') { e.preventDefault(); setShowLinkedInImport(true); return; }
       // Alt+K: Conference import
       if (e.key === 'k') { e.preventDefault(); setShowConferenceImport(true); return; }
+      // Alt+S: Focus global search
+      if (e.key === 's') { e.preventDefault(); searchInputRef.current?.focus(); searchInputRef.current?.select(); return; }
       // Alt+X: Clear all filters
       if (e.key === 'x') { e.preventDefault(); handleClearAllFilters(); return; }
       // Direct tab shortcuts
@@ -277,6 +280,11 @@ function App() {
     setLookupSearch('');
   }, []);
 
+  const handleMenuFocusSearch = useCallback(() => {
+    searchInputRef.current?.focus();
+    searchInputRef.current?.select();
+  }, []);
+
   const handleMenuLinkedInSearch = useCallback(() => {
     contactTableRef.current?.triggerLinkedInSearch?.();
   }, []);
@@ -347,6 +355,7 @@ function App() {
             tab={tab}
             onNavigate={setTab}
             onGlobalLookup={handleMenuGlobalLookup}
+            onFocusSearch={handleMenuFocusSearch}
             onLinkedInSearch={handleMenuLinkedInSearch}
             onOpenUrl={handleMenuOpenUrl}
             onClearFilters={handleClearAllFilters}
@@ -359,15 +368,14 @@ function App() {
             onPageBackward={handleMenuPageBackward}
           />
           <div className="app-bar-right">
-            {(tab === 'contacts' || tab === 'activities' || tab === 'content') && (
-              <input
-                type="text"
-                className="app-bar-search"
-                placeholder="Search..."
-                value={quickFilterText}
-                onChange={(e) => setQuickFilterText(e.target.value)}
-              />
-            )}
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="app-bar-search"
+              placeholder="Search... (Alt+S)"
+              value={quickFilterText}
+              onChange={(e) => setQuickFilterText(e.target.value)}
+            />
             <button className="clear-filters-btn" onClick={handleClearAllFilters} title="Clear all filters and search (Alt+X)">
               Clear Filters
             </button>
@@ -445,6 +453,7 @@ function App() {
               onUpdateContent={handleUpdateContent}
               onDeleteContentBatch={handleDeleteContentBatch}
               onNewActivityForContent={handleNewActivityForContent}
+              quickFilterText={quickFilterText}
             />
           </div>
           <div style={{ display: tab === 'reports' ? 'block' : 'none' }}>
@@ -452,6 +461,7 @@ function App() {
               contacts={contacts}
               activities={activities}
               content={content}
+              quickFilterText={quickFilterText}
             />
           </div>
         </main>

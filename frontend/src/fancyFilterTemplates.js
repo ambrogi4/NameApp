@@ -109,42 +109,29 @@ const templates = [
     },
   },
   {
-    id: 'content_with_most_activity',
-    label: 'Content with most activity',
+    id: 'content_with_no_activity_since',
+    label: 'Content with no activity since [date]',
     resultTable: 'content',
-    params: [],
-    execute: (data) => {
+    params: [
+      { key: 'date', type: 'date', label: 'Since date', required: true,
+        defaultValue: () => {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          return d.toISOString().slice(0, 10);
+        },
+      },
+    ],
+    execute: (data, params) => {
       const { content, activities } = data;
-      if (content.length === 0) return [];
-      const counts = {};
-      activities.forEach(a => {
-        if (a.content_id != null) {
-          counts[a.content_id] = (counts[a.content_id] || 0) + 1;
-        }
+      // Find content where there is no activity on or after the given date
+      return content.filter(c => {
+        const contentActivities = activities.filter(a => a.content_id === c.id);
+        if (contentActivities.length === 0) return true;
+        const latest = contentActivities.reduce((max, a) =>
+          (a.activity_date || '') > (max.activity_date || '') ? a : max
+        );
+        return (latest.activity_date || '') < params.date;
       });
-      let maxId = null;
-      let maxCount = 0;
-      for (const [id, count] of Object.entries(counts)) {
-        if (count > maxCount) {
-          maxCount = count;
-          maxId = Number(id);
-        }
-      }
-      if (maxId == null) return [];
-      return content.filter(c => c.id === maxId);
-    },
-  },
-  {
-    id: 'content_with_no_activity',
-    label: 'Content with no activity',
-    resultTable: 'content',
-    params: [],
-    execute: (data) => {
-      const { content, activities } = data;
-      const contentIdsWithActivity = new Set(
-        activities.map(a => a.content_id).filter(id => id != null)
-      );
-      return content.filter(c => !contentIdsWithActivity.has(c.id));
     },
   },
 ];

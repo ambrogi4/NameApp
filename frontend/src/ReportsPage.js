@@ -30,7 +30,13 @@ function formatDate(d) {
   return d;
 }
 
-function ReportsPage({ contacts, activities, content }) {
+function matchesSearch(text, search) {
+  if (!search) return true;
+  if (!text) return false;
+  return String(text).toLowerCase().includes(search.toLowerCase());
+}
+
+function ReportsPage({ contacts, activities, content, quickFilterText }) {
   const quarterOptions = useMemo(() => getQuarterOptions(), []);
   const [selectedQuarter, setSelectedQuarter] = useState(0); // index into quarterOptions
   const [selectedFirm, setSelectedFirm] = useState('__all__');
@@ -65,20 +71,24 @@ function ReportsPage({ contacts, activities, content }) {
       .sort((a, b) => (b.activity_date || '').localeCompare(a.activity_date || ''))
       .map(a => {
         const c = contactMap[a.contact_id];
-        const contactLabel = c
-          ? [c.first, c.last].filter(Boolean).join(' ')
-            + (c.title ? `, ${c.title}` : '')
-            + (c.firm ? ` at ${c.firm}` : '')
-          : `#${a.contact_id}`;
         const contentItem = a.content_id ? contentMap[a.content_id] : null;
-        const parts = [formatDate(a.activity_date), contactLabel];
-        if (a.channel) parts.push(`via ${a.channel}`);
-        if (a.topic) parts.push(`— ${a.topic}`);
-        if (contentItem) parts.push(`[${contentItem.short_name || contentItem.title || '#' + contentItem.id}]`);
-        if (a.comment) parts.push(`// ${a.comment}`);
-        return parts.join('  ');
-      });
-  }, [activities, contactMap, contentMap]);
+        // Build searchable text for filtering
+        const searchText = [
+          a.activity_date,
+          c?.firm,
+          c?.first,
+          c?.last,
+          c?.title,
+          a.channel,
+          a.topic,
+          contentItem?.short_name || contentItem?.title,
+          a.comment
+        ].filter(Boolean).join(' ');
+
+        return { activity: a, contact: c, contentItem, searchText };
+      })
+      .filter(item => matchesSearch(item.searchText, quickFilterText));
+  }, [activities, contactMap, contentMap, quickFilterText]);
 
   const handleRun = () => {
     const opt = quarterOptions[selectedQuarter];
@@ -197,6 +207,30 @@ function ReportsPage({ contacts, activities, content }) {
 
   const showFirmGroup = selectedFirm === '__all__';
 
+  // Filter report data by search term
+  const filteredReportData = useMemo(() => {
+    if (!reportData) return null;
+    if (!quickFilterText) return reportData;
+    const search = quickFilterText.toLowerCase();
+    return {
+      outreachRows: reportData.outreachRows.filter(r =>
+        matchesSearch(r.name, search) || matchesSearch(r.firm, search) || matchesSearch(r.channels, search)
+      ),
+      contentRows: reportData.contentRows.filter(r =>
+        matchesSearch(r.title, search) || matchesSearch(r.recipients, search)
+      ),
+      responseRows: reportData.responseRows.filter(r =>
+        matchesSearch(r.name, search) || matchesSearch(r.firm, search) || matchesSearch(r.topic, search) || matchesSearch(r.comment, search)
+      ),
+      dormantRows: reportData.dormantRows.filter(r =>
+        matchesSearch(r.name, search) || matchesSearch(r.firm, search)
+      ),
+      commentRows: reportData.commentRows.filter(r =>
+        matchesSearch(r.name, search) || matchesSearch(r.firm, search) || matchesSearch(r.topic, search) || matchesSearch(r.comment, search)
+      ),
+    };
+  }, [reportData, quickFilterText]);
+
   function groupByFirm(rows) {
     const groups = {};
     rows.forEach(r => {
@@ -226,8 +260,18 @@ function ReportsPage({ contacts, activities, content }) {
         {weeklyActivities.length === 0
           ? <p className="report-empty">No activity in the last 7 days</p>
           : <div className="report-text-block">
-              {weeklyActivities.map((line, i) => (
-                <div key={i} className="report-text-line">{line}</div>
+              {weeklyActivities.map(({ activity: a, contact: c, contentItem }, i) => (
+                <div key={i} className="report-text-line">
+                  {formatDate(a.activity_date)}
+                  {'  '}
+                  {c?.firm && <><strong>{c.firm}</strong>{'  '}</>}
+                  {c ? [c.first, c.last].filter(Boolean).join(' ') : `#${a.contact_id}`}
+                  {c?.title && `, ${c.title}`}
+                  {a.channel && `  via ${a.channel}`}
+                  {a.topic && `  — ${a.topic}`}
+                  {contentItem && `  [${contentItem.short_name || contentItem.title || '#' + contentItem.id}]`}
+                  {a.comment && `  // ${a.comment}`}
+                </div>
               ))}
             </div>
         }
@@ -254,14 +298,14 @@ function ReportsPage({ contacts, activities, content }) {
         <button className="reports-run-btn" onClick={handleRun}>Run All</button>
       </div>
 
-      {hasRun && reportData && (
+      {hasRun && filteredReportData && (
         <div className="reports-body">
           {/* Section 1: Outreach Summary */}
           <div className="report-section">
             <h3>Outreach Summary</h3>
-            {reportData.outreachRows.length === 0
+            {filteredReportData.outreachRows.length === 0
               ? <p className="report-empty">No outreach this quarter</p>
-              : renderGrouped(reportData.outreachRows, (rows) => (
+              : renderGrouped(filteredReportData.outreachRows, (rows) => (
                 <table className="report-table">
                   <thead>
                     <tr><th>Name</th><th># Activities</th><th>Channels</th><th>Most Recent</th></tr>
@@ -279,7 +323,7 @@ function ReportsPage({ contacts, activities, content }) {
           {/* Section 2: Content Distribution */}
           <div className="report-section">
             <h3>Content Distribution</h3>
-            {reportData.contentRows.length === 0
+            {filteredReportData.contentRows.length === 0
               ? <p className="report-empty">No content sent this quarter</p>
               : (
                 <table className="report-table">
@@ -287,7 +331,7 @@ function ReportsPage({ contacts, activities, content }) {
                     <tr><th>Title</th><th># Recipients</th><th>Recipients</th></tr>
                   </thead>
                   <tbody>
-                    {reportData.contentRows.map((r, i) => (
+                    {filteredReportData.contentRows.map((r, i) => (
                       <tr key={i}><td>{r.title}</td><td>{r.recipientCount}</td><td>{r.recipients}</td></tr>
                     ))}
                   </tbody>
@@ -299,9 +343,9 @@ function ReportsPage({ contacts, activities, content }) {
           {/* Section 3: Responses */}
           <div className="report-section">
             <h3>Responses</h3>
-            {reportData.responseRows.length === 0
+            {filteredReportData.responseRows.length === 0
               ? <p className="report-empty">No responses this quarter</p>
-              : renderGrouped(reportData.responseRows, (rows) => (
+              : renderGrouped(filteredReportData.responseRows, (rows) => (
                 <table className="report-table">
                   <thead>
                     <tr><th>Name</th><th>Date</th><th>Channel</th><th>Topic</th><th>Comment</th></tr>
@@ -319,9 +363,9 @@ function ReportsPage({ contacts, activities, content }) {
           {/* Section 4: Dormant Contacts */}
           <div className="report-section">
             <h3>Dormant Contacts</h3>
-            {reportData.dormantRows.length === 0
+            {filteredReportData.dormantRows.length === 0
               ? <p className="report-empty">No dormant contacts</p>
-              : renderGrouped(reportData.dormantRows, (rows) => (
+              : renderGrouped(filteredReportData.dormantRows, (rows) => (
                 <table className="report-table">
                   <thead>
                     <tr><th>Name</th><th>Last Activity</th></tr>
@@ -339,9 +383,9 @@ function ReportsPage({ contacts, activities, content }) {
           {/* Section 5: Activity Detail with Comments */}
           <div className="report-section">
             <h3>Activity Detail with Comments</h3>
-            {reportData.commentRows.length === 0
+            {filteredReportData.commentRows.length === 0
               ? <p className="report-empty">No activities with comments this quarter</p>
-              : renderGrouped(reportData.commentRows, (rows) => (
+              : renderGrouped(filteredReportData.commentRows, (rows) => (
                 <table className="report-table">
                   <thead>
                     <tr><th>Name</th><th>Date</th><th>Channel</th><th>Topic</th><th>Comment</th></tr>

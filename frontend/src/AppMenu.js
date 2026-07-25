@@ -4,6 +4,7 @@ const AppMenu = ({
   tab,
   onNavigate,
   onGlobalLookup,
+  onFocusSearch,
   onLinkedInSearch,
   onOpenUrl,
   onClearFilters,
@@ -145,6 +146,12 @@ const AppMenu = ({
               label="Global Lookup"
               shortcut="Alt+G"
               onClick={() => executeAction(onGlobalLookup)}
+              indent
+            />
+            <MenuItem
+              label="Focus Search"
+              shortcut="Alt+S"
+              onClick={() => executeAction(onFocusSearch)}
               indent
             />
             <MenuItem

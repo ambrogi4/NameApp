@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import templates from './fancyFilterTemplates';
 import TypeAheadInput from './TypeAheadInput';
+import { CHANNELS } from './gridUtils';
 
 // Group templates by the first word of their label (Activities, Contacts, Content, etc.)
 const groupedTemplates = (() => {
@@ -17,8 +18,213 @@ const groupedTemplates = (() => {
   return groups;
 })();
 
-function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) {
+// ── Date helpers for saved queries ───────────────────────────────────────────
+function getStartOfWeek() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+}
+
+function getStartOfMonth() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function getStartOfQuarter() {
+  const d = new Date();
+  const quarter = Math.floor(d.getMonth() / 3);
+  return new Date(d.getFullYear(), quarter * 3, 1).toISOString().slice(0, 10);
+}
+
+function getDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+// ── Saved queries (hardcoded parameters, immediate execution) ────────────────
+const savedQueries = [
+  // Activities
+  {
+    id: 'activity_by_channel_week',
+    label: 'Activity by channel this week',
+    group: 'Activities',
+    resultType: 'pivot',
+    execute: (data) => {
+      const startDate = getStartOfWeek();
+      const { activities } = data;
+      const filtered = activities.filter(a => (a.activity_date || '') >= startDate);
+      const counts = {};
+      CHANNELS.forEach(ch => counts[ch] = 0);
+      filtered.forEach(a => {
+        if (a.channel && counts.hasOwnProperty(a.channel)) {
+          counts[a.channel]++;
+        }
+      });
+      return Object.entries(counts).map(([channel, count]) => ({ channel, count }));
+    },
+  },
+  {
+    id: 'activity_by_channel_month',
+    label: 'Activity by channel this month',
+    group: 'Activities',
+    resultType: 'pivot',
+    execute: (data) => {
+      const startDate = getStartOfMonth();
+      const { activities } = data;
+      const filtered = activities.filter(a => (a.activity_date || '') >= startDate);
+      const counts = {};
+      CHANNELS.forEach(ch => counts[ch] = 0);
+      filtered.forEach(a => {
+        if (a.channel && counts.hasOwnProperty(a.channel)) {
+          counts[a.channel]++;
+        }
+      });
+      return Object.entries(counts).map(([channel, count]) => ({ channel, count }));
+    },
+  },
+  {
+    id: 'activity_by_channel_quarter',
+    label: 'Activity by channel this quarter',
+    group: 'Activities',
+    resultType: 'pivot',
+    execute: (data) => {
+      const startDate = getStartOfQuarter();
+      const { activities } = data;
+      const filtered = activities.filter(a => (a.activity_date || '') >= startDate);
+      const counts = {};
+      CHANNELS.forEach(ch => counts[ch] = 0);
+      filtered.forEach(a => {
+        if (a.channel && counts.hasOwnProperty(a.channel)) {
+          counts[a.channel]++;
+        }
+      });
+      return Object.entries(counts).map(([channel, count]) => ({ channel, count }));
+    },
+  },
+  // Contacts
+  {
+    id: 'target1_no_activity_2weeks',
+    label: 'Contacts with tag Target1 with no activity since 2 weeks',
+    group: 'Contacts',
+    resultType: 'contacts',
+    execute: (data) => {
+      const sinceDate = getDaysAgo(14);
+      const { contacts, activities } = data;
+      const taggedContacts = contacts.filter(c => {
+        const tags = (c.tags || '').split(',').map(t => t.trim().toLowerCase());
+        return tags.includes('target1');
+      });
+      return taggedContacts.filter(c => {
+        const contactActivities = activities.filter(a => a.contact_id === c.id);
+        if (contactActivities.length === 0) return true;
+        const latest = contactActivities.reduce((max, a) =>
+          (a.activity_date || '') > (max.activity_date || '') ? a : max
+        );
+        return (latest.activity_date || '') < sinceDate;
+      });
+    },
+  },
+  {
+    id: 'target1_no_activity_1month',
+    label: 'Contacts with tag Target1 with no activity since 1 month',
+    group: 'Contacts',
+    resultType: 'contacts',
+    execute: (data) => {
+      const sinceDate = getDaysAgo(30);
+      const { contacts, activities } = data;
+      const taggedContacts = contacts.filter(c => {
+        const tags = (c.tags || '').split(',').map(t => t.trim().toLowerCase());
+        return tags.includes('target1');
+      });
+      return taggedContacts.filter(c => {
+        const contactActivities = activities.filter(a => a.contact_id === c.id);
+        if (contactActivities.length === 0) return true;
+        const latest = contactActivities.reduce((max, a) =>
+          (a.activity_date || '') > (max.activity_date || '') ? a : max
+        );
+        return (latest.activity_date || '') < sinceDate;
+      });
+    },
+  },
+  {
+    id: 'target1_no_activity_2months',
+    label: 'Contacts with tag Target1 with no activity since 2 months',
+    group: 'Contacts',
+    resultType: 'contacts',
+    execute: (data) => {
+      const sinceDate = getDaysAgo(60);
+      const { contacts, activities } = data;
+      const taggedContacts = contacts.filter(c => {
+        const tags = (c.tags || '').split(',').map(t => t.trim().toLowerCase());
+        return tags.includes('target1');
+      });
+      return taggedContacts.filter(c => {
+        const contactActivities = activities.filter(a => a.contact_id === c.id);
+        if (contactActivities.length === 0) return true;
+        const latest = contactActivities.reduce((max, a) =>
+          (a.activity_date || '') > (max.activity_date || '') ? a : max
+        );
+        return (latest.activity_date || '') < sinceDate;
+      });
+    },
+  },
+  {
+    id: 'target1_no_activity_quarter',
+    label: 'Contacts with tag Target1 with no activity this quarter',
+    group: 'Contacts',
+    resultType: 'contacts',
+    execute: (data) => {
+      const sinceDate = getStartOfQuarter();
+      const { contacts, activities } = data;
+      const taggedContacts = contacts.filter(c => {
+        const tags = (c.tags || '').split(',').map(t => t.trim().toLowerCase());
+        return tags.includes('target1');
+      });
+      return taggedContacts.filter(c => {
+        const contactActivities = activities.filter(a => a.contact_id === c.id);
+        if (contactActivities.length === 0) return true;
+        const latest = contactActivities.reduce((max, a) =>
+          (a.activity_date || '') > (max.activity_date || '') ? a : max
+        );
+        return (latest.activity_date || '') < sinceDate;
+      });
+    },
+  },
+  // Content
+  {
+    id: 'content_no_activity',
+    label: 'Content with no activity',
+    group: 'Content',
+    resultType: 'content',
+    execute: (data) => {
+      const { content, activities } = data;
+      const contentIdsWithActivity = new Set(
+        activities.map(a => a.content_id).filter(id => id != null)
+      );
+      return content.filter(c => !contentIdsWithActivity.has(c.id));
+    },
+  },
+];
+
+// Group saved queries by group
+const groupedSavedQueries = (() => {
+  const groups = [];
+  let currentGroup = null;
+  savedQueries.forEach(q => {
+    if (q.group !== currentGroup) {
+      groups.push({ label: q.group, items: [] });
+      currentGroup = q.group;
+    }
+    groups[groups.length - 1].items.push(q);
+  });
+  return groups;
+})();
+
+function FancyFilterPanel({ contacts, activities, content, onRun, onRunSaved, resultCount, lightMode }) {
   const [templateId, setTemplateId] = useState('');
+  const [savedQueryId, setSavedQueryId] = useState('');
   const [params, setParams] = useState({});
 
   const template = templates.find(t => t.id === templateId);
@@ -26,6 +232,7 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) 
   const handleTemplateChange = useCallback((e) => {
     const id = e.target.value;
     setTemplateId(id);
+    setSavedQueryId(''); // Clear saved query selection
     const tmpl = templates.find(t => t.id === id);
     const defaults = {};
     if (tmpl) {
@@ -37,6 +244,22 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) 
     }
     setParams(defaults);
   }, []);
+
+  const handleSavedQueryChange = useCallback((e) => {
+    const id = e.target.value;
+    setSavedQueryId(id);
+    if (id) {
+      setTemplateId(''); // Clear flex query selection
+      setParams({});
+      // Execute immediately
+      const query = savedQueries.find(q => q.id === id);
+      if (query && onRunSaved) {
+        const data = { contacts, activities, content };
+        const results = query.execute(data);
+        onRunSaved(results, query.resultType);
+      }
+    }
+  }, [contacts, activities, content, onRunSaved]);
 
   const setParam = useCallback((key, value) => {
     setParams(prev => ({ ...prev, [key]: value }));
@@ -102,11 +325,26 @@ function FancyFilterPanel({ contacts, content, onRun, resultCount, lightMode }) 
         value={templateId}
         onChange={handleTemplateChange}
       >
-        <option value="">Select a query...</option>
+        <option value="">Select a flex query...</option>
         {groupedTemplates.map(g => (
           <optgroup key={g.label} label={g.label}>
             {g.items.map(t => (
               <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+
+      <select
+        className={selectClass}
+        value={savedQueryId}
+        onChange={handleSavedQueryChange}
+      >
+        <option value="">Select a saved query...</option>
+        {groupedSavedQueries.map(g => (
+          <optgroup key={g.label} label={g.label}>
+            {g.items.map(q => (
+              <option key={q.id} value={q.id}>{q.label}</option>
             ))}
           </optgroup>
         ))}

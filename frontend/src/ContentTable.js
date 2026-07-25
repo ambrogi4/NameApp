@@ -267,7 +267,7 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
   }, [selectedRows]);
 
   return (
-    <div>
+    <div style={lookupMode ? { height: '100%' } : undefined}>
       {!lookupMode && (newRowHasData || selectedRows.length > 0) && (
         <div className="contact-toolbar">
           {newRowHasData && (
@@ -299,7 +299,7 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
           )}
         </div>
       )}
-      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 75px)' }} tabIndex={0}>
+      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: lookupMode ? '100%' : 'calc(100vh - 75px)' }} tabIndex={0}>
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}

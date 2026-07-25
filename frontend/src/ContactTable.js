@@ -466,7 +466,7 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
   }, []);
 
   return (
-    <div>
+    <div style={lookupMode ? { height: '100%' } : undefined}>
       {!lookupMode && (newRowHasData || selectedRows.length > 0) && (
         <div className="contact-toolbar">
           {newRowHasData && (
@@ -503,7 +503,7 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
           )}
         </div>
       )}
-      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: 'calc(100vh - 118px)' }} tabIndex={0}>
+      <div ref={containerRef} className="ag-theme-balham" style={{ width: '100%', height: lookupMode ? '100%' : 'calc(100vh - 118px)' }} tabIndex={0}>
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}

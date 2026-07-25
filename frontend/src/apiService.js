@@ -85,3 +85,15 @@ export const fetchActivities = (contactId) =>
 export const createActivity = (data) => apiPost('/activities', data);
 export const updateActivity = (id, data) => apiPut(`/activities/${id}`, data);
 export const deleteActivity = (id) => apiDelete(`/activities/${id}`);
+
+// Natural Language Query
+export const executeNaturalLanguageQuery = async (query) => {
+  const res = await fetch(`${API_URL}/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+};
