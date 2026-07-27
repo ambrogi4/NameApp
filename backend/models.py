@@ -56,6 +56,102 @@ class Contact(db.Model):
         }
 
 
+class ContactStaging(db.Model):
+    __tablename__ = 'contact_staging'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_date = db.Column(db.DateTime, default=datetime.now)
+
+    # All Contact columns
+    first = db.Column(db.Text, nullable=False)
+    last = db.Column(db.Text, nullable=False)
+    title = db.Column(db.Text)
+    firm = db.Column(db.Text)
+    source = db.Column(db.Text)
+    education = db.Column(db.Text)
+    tags = db.Column(db.Text)
+    comment = db.Column(db.Text)
+    email = db.Column(db.Text)
+    phone = db.Column(db.Text)
+    street = db.Column(db.Text)
+    city = db.Column(db.Text)
+    state = db.Column(db.Text)
+    zip = db.Column(db.Text)
+    country = db.Column(db.Text)
+    li_url = db.Column(db.Text)
+    photo_url = db.Column(db.Text)
+    in_crm = db.Column(db.Boolean, default=False)
+    index_1 = db.Column(db.Integer)
+    index_2 = db.Column(db.Integer)
+
+    # Staging-specific columns
+    source_type = db.Column(db.Text)  # linkedin_import, conference_import, manual, url_fetch, paste
+    dupe_status = db.Column(db.Text, default='pending')  # pending, no_match, has_match, promoted, skipped
+    matched_contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='SET NULL'), nullable=True)
+    email_confidence = db.Column(db.Text, default='none')  # none, guessed, verified
+    enrichment_status = db.Column(db.Text, default='pending')  # pending, enriched, failed
+
+    # Relationship to matched contact
+    matched_contact = db.relationship('Contact', foreign_keys=[matched_contact_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'created_date': self.created_date.isoformat() if self.created_date else None,
+            'first': self.first,
+            'last': self.last,
+            'title': self.title,
+            'firm': self.firm,
+            'source': self.source,
+            'education': self.education,
+            'tags': self.tags,
+            'comment': self.comment,
+            'email': self.email,
+            'phone': self.phone,
+            'street': self.street,
+            'city': self.city,
+            'state': self.state,
+            'zip': self.zip,
+            'country': self.country,
+            'li_url': self.li_url,
+            'photo_url': self.photo_url,
+            'in_crm': self.in_crm,
+            'index_1': self.index_1,
+            'index_2': self.index_2,
+            # Staging-specific
+            'source_type': self.source_type,
+            'dupe_status': self.dupe_status,
+            'matched_contact_id': self.matched_contact_id,
+            'email_confidence': self.email_confidence,
+            'enrichment_status': self.enrichment_status,
+        }
+
+    def to_contact_dict(self):
+        """Extract only Contact-compatible fields for promotion."""
+        return {
+            'first': self.first,
+            'last': self.last,
+            'title': self.title,
+            'firm': self.firm,
+            'source': self.source,
+            'education': self.education,
+            'tags': self.tags,
+            'comment': self.comment,
+            'email': self.email,
+            'phone': self.phone,
+            'street': self.street,
+            'city': self.city,
+            'state': self.state,
+            'zip': self.zip,
+            'country': self.country,
+            'li_url': self.li_url,
+            'photo_url': self.photo_url,
+            'in_crm': self.in_crm,
+            'index_1': self.index_1,
+            'index_2': self.index_2,
+        }
+
+
 class Content(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     type = db.Column(db.Text)

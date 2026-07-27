@@ -6,12 +6,16 @@ import {
   fetchContacts, createContact, updateContact, deleteContact, createContactsBatch,
   fetchContent, createContent, updateContent, deleteContent,
   fetchActivities, createActivity, updateActivity, deleteActivity,
+  fetchStagedContacts, createStagedContact, createStagedContactsBatch,
+  updateStagedContact, deleteStagedContact, promoteStagedContact, promoteStagedContactsBatch,
 } from './apiService';
 import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
 import ContentTable from './ContentTable';
 import ContentUrlFetcher from './ContentUrlFetcher';
 import ActivityTable from './ActivityTable';
+import StagingTable from './StagingTable';
+import StagingPromoteModal from './StagingPromoteModal';
 import DupeReviewModal from './DupeReviewModal';
 import LinkedInImportModal from './LinkedInImportModal';
 import LinkedInUpdateModal from './LinkedInUpdateModal';
@@ -25,11 +29,13 @@ import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
 import './App.css';
 
 function App() {
-  const TAB_ORDER = ['activities', 'contacts', 'content', 'filter', 'reports'];
+  const TAB_ORDER = ['activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
   const [tab, setTab] = useState('activities');
   const [contacts, setContacts] = useState([]);
+  const [stagedContacts, setStagedContacts] = useState([]);
   const [content, setContent] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [stagingPromoteModal, setStagingPromoteModal] = useState(null);
   const [prefillContactId, setPrefillContactId] = useState(null);
   const [prefillContentId, setPrefillContentId] = useState(null);
   const [dupeReviewQueue, setDupeReviewQueue] = useState([]);
@@ -47,6 +53,7 @@ function App() {
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
   const contentTableRef = useRef(null);
+  const stagingTableRef = useRef(null);
   const searchInputRef = useRef(null);
 
   const handleClearAllFilters = useCallback(() => {
@@ -54,6 +61,7 @@ function App() {
     if (tab === 'contacts') contactTableRef.current?.clearFilters();
     else if (tab === 'activities') activityTableRef.current?.clearFilters();
     else if (tab === 'content') contentTableRef.current?.clearFilters();
+    else if (tab === 'staging') stagingTableRef.current?.clearFilters();
   }, [tab]);
 
   useEffect(() => {
@@ -76,6 +84,7 @@ function App() {
       if (e.key === 'x') { e.preventDefault(); handleClearAllFilters(); return; }
       // Direct tab shortcuts
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
+      if (e.key === 't') { e.preventDefault(); setTab('staging'); return; }
       if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
       if (e.key === 'n') { e.preventDefault(); setTab('content'); return; }
       if (e.key === 'f') { e.preventDefault(); setTab('filter'); return; }
@@ -101,6 +110,7 @@ function App() {
       if (cfg.instanceColor) setInstanceColor(cfg.instanceColor);
     }).catch(console.error);
     fetchContacts().then(setContacts).catch(console.error);
+    fetchStagedContacts().then(setStagedContacts).catch(console.error);
     fetchContent().then(setContent).catch(console.error);
     fetchActivities().then(setActivities).catch(console.error);
   }, []);
@@ -210,6 +220,78 @@ function App() {
         setActivities(prev => prev.filter(a => !idSet.has(a.contact_id)));
       })
       .catch(console.error);
+  };
+
+  // --- Staging handlers ---
+  const handleCreateStagedContact = (data) => {
+    createStagedContact(data)
+      .then(created => setStagedContacts(prev => [...prev, created]))
+      .catch(console.error);
+  };
+
+  const handleCreateStagedContactsBatch = (dataArray) => {
+    createStagedContactsBatch(dataArray)
+      .then(created => setStagedContacts(prev => [...prev, ...created]))
+      .catch(console.error);
+  };
+
+  const handleUpdateStagedContact = (id, data) => {
+    updateStagedContact(id, data)
+      .then(updated => setStagedContacts(prev => prev.map(s => s.id === updated.id ? updated : s)))
+      .catch(console.error);
+  };
+
+  const handleDeleteStagedContact = (id) => {
+    deleteStagedContact(id)
+      .then(() => setStagedContacts(prev => prev.filter(s => s.id !== id)))
+      .catch(console.error);
+  };
+
+  const handlePromoteStagedContact = (id, options) => {
+    promoteStagedContact(id, options)
+      .then(contact => {
+        setStagedContacts(prev => prev.filter(s => s.id !== id));
+        setContacts(prev => {
+          const exists = prev.find(c => c.id === contact.id);
+          return exists
+            ? prev.map(c => c.id === contact.id ? contact : c)
+            : [...prev, contact];
+        });
+      })
+      .catch(console.error);
+  };
+
+  const handlePromoteStagedBatch = (actions) => {
+    promoteStagedContactsBatch(actions)
+      .then(results => {
+        const promotedIds = new Set([
+          ...results.created.map(c => c.id),
+          ...results.merged.map(m => m.staging_id),
+          ...results.skipped,
+        ]);
+        setStagedContacts(prev => prev.filter(s => !promotedIds.has(s.id) && !results.skipped.includes(s.id)));
+        // Add newly created contacts
+        if (results.created.length > 0) {
+          setContacts(prev => [...prev, ...results.created]);
+        }
+        // Update merged contacts
+        if (results.merged.length > 0) {
+          const mergedMap = {};
+          results.merged.forEach(m => { mergedMap[m.contact.id] = m.contact; });
+          setContacts(prev => prev.map(c => mergedMap[c.id] || c));
+        }
+        // Refetch staged to ensure consistency
+        fetchStagedContacts().then(setStagedContacts).catch(console.error);
+      })
+      .catch(console.error);
+  };
+
+  const handleViewStagingMatch = (staged) => {
+    if (!staged.matched_contact_id) return;
+    const matchedContact = contacts.find(c => c.id === staged.matched_contact_id);
+    if (matchedContact) {
+      setStagingPromoteModal({ staged, matchedContact });
+    }
   };
 
   // --- Content handlers ---
@@ -346,6 +428,9 @@ function App() {
           <span className="app-bar-title" style={{ background: instanceColor }}>{instanceName}</span>
           <div className="app-bar-tabs">
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
+            <button className={tab === 'staging' ? 'tab active' : 'tab'} onClick={() => setTab('staging')}>
+              Staging{stagedContacts.length > 0 && <span className="tab-badge">{stagedContacts.length}</span>}
+            </button>
             <button className={tab === 'contacts' ? 'tab active' : 'tab'} onClick={() => setTab('contacts')}>Contacts</button>
             <button className={tab === 'content' ? 'tab active' : 'tab'} onClick={() => setTab('content')}>Content</button>
             <button className={tab === 'filter' ? 'tab active' : 'tab'} onClick={() => setTab('filter')}>Filter</button>
@@ -398,6 +483,21 @@ function App() {
               prefillContactId={prefillContactId}
               prefillContentId={prefillContentId}
               onClearPrefill={() => { setPrefillContactId(null); setPrefillContentId(null); }}
+            />
+          </div>
+          <div style={{ display: tab === 'staging' ? 'block' : 'none' }}>
+            <StagingTable
+              ref={stagingTableRef}
+              stagedContacts={stagedContacts}
+              contacts={contacts}
+              onUpdateStagedContact={handleUpdateStagedContact}
+              onCreateStagedContact={handleCreateStagedContact}
+              onDeleteStagedContact={handleDeleteStagedContact}
+              onPromoteStagedContact={handlePromoteStagedContact}
+              onPromoteBatch={handlePromoteStagedBatch}
+              onViewMatch={handleViewStagingMatch}
+              onRefreshStagedContacts={() => fetchStagedContacts().then(setStagedContacts).catch(console.error)}
+              quickFilterText={quickFilterText}
             />
           </div>
           <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
@@ -494,13 +594,13 @@ function App() {
         )}
         {showLinkedInImport && (
           <LinkedInImportModal
-            onSave={handleCreateContact}
+            onSave={handleCreateStagedContact}
             onClose={() => setShowLinkedInImport(false)}
           />
         )}
         {showConferenceImport && (
           <ConferenceImportModal
-            onImport={handleDirectBatchCreate}
+            onImport={handleCreateStagedContactsBatch}
             onClose={() => setShowConferenceImport(false)}
           />
         )}
@@ -518,6 +618,14 @@ function App() {
             onSkip={() => {}}
             onCreateAnyway={handleDupeCreateAnyway}
             onClose={() => setDupeReviewQueue([])}
+          />
+        )}
+        {stagingPromoteModal && (
+          <StagingPromoteModal
+            staged={stagingPromoteModal.staged}
+            matchedContact={stagingPromoteModal.matchedContact}
+            onPromote={handlePromoteStagedContact}
+            onClose={() => setStagingPromoteModal(null)}
           />
         )}
         <PasteConfirmBar

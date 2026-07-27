@@ -66,7 +66,7 @@ export default function LinkedInImportModal({ onSave, onClose }) {
   };
 
   const handleSave = () => {
-    const data = { ...parsed };
+    const data = { ...parsed, source_type: 'linkedin_import' };
     if (profileUrl.trim()) {
       let url = profileUrl.trim();
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;

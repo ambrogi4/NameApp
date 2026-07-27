@@ -39,6 +39,7 @@ export default function ConferenceImportModal({ onImport, onClose }) {
     const contacts = speakers.map(s => ({
       ...s,
       source: source.trim() || undefined,
+      source_type: 'conference_import',
     }));
     onImport(contacts);
     onClose();

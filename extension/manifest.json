@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "NameApp LinkedIn Capture",
+  "version": "1.0.0",
+  "description": "Capture LinkedIn profiles to NameApp staging",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "http://localhost:5000/*",
+    "http://localhost:5001/*",
+    "http://localhost:5002/*",
+    "http://localhost:5003/*",
+    "http://100.121.134.27:5000/*",
+    "http://100.121.134.27:5001/*",
+    "http://100.121.134.27:5002/*",
+    "http://100.121.134.27:5003/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

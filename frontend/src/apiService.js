@@ -97,3 +97,15 @@ export const executeNaturalLanguageQuery = async (query) => {
   if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
   return data;
 };
+
+// Staging
+export const fetchStagedContacts = (dupeStatus) =>
+  apiGet(dupeStatus ? `/staging?dupe_status=${dupeStatus}` : '/staging');
+export const createStagedContact = (data) => apiPost('/staging', data);
+export const createStagedContactsBatch = (dataArray) => apiPost('/staging/batch', dataArray);
+export const updateStagedContact = (id, data) => apiPut(`/staging/${id}`, data);
+export const deleteStagedContact = (id) => apiDelete(`/staging/${id}`);
+export const promoteStagedContact = (id, options = {}) => apiPost(`/staging/${id}/promote`, options);
+export const promoteStagedContactsBatch = (actions) => apiPost('/staging/promote-batch', actions);
+export const recheckStagingDupes = () => apiPost('/staging/recheck-dupes', {});
+export const guessStagedContactEmails = (ids) => apiPost('/staging/guess-emails', { ids });
