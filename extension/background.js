@@ -1,6 +1,6 @@
 const API_BASE = 'http://100.121.134.27:5000/api';
 
-async function captureToStaging(profileText, profileUrl) {
+async function captureToStaging(profileText, profileUrl, sourceType, comment) {
   // Step 1: Parse with Claude
   const parseRes = await fetch(`${API_BASE}/contacts/parse-linkedin`, {
     method: 'POST',
@@ -19,8 +19,13 @@ async function captureToStaging(profileText, profileUrl) {
   const stagingData = {
     ...parsed,
     li_url: profileUrl,
-    source_type: 'linkedin_import'
+    source_type: sourceType || 'linkedin_import'
   };
+
+  // Add comment if provided (for CR captures)
+  if (comment) {
+    stagingData.comment = comment;
+  }
 
   const stagingRes = await fetch(`${API_BASE}/staging`, {
     method: 'POST',
@@ -39,7 +44,7 @@ async function captureToStaging(profileText, profileUrl) {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'capture') {
-    captureToStaging(request.text, request.url)
+    captureToStaging(request.text, request.url, request.sourceType, request.comment)
       .then(result => sendResponse({ success: true, data: result }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true; // Async response

@@ -17,6 +17,7 @@ import ActivityTable from './ActivityTable';
 import StagingTable from './StagingTable';
 import StagingPromoteModal from './StagingPromoteModal';
 import DupeReviewModal from './DupeReviewModal';
+import MergeReviewModal from './MergeReviewModal';
 import LinkedInImportModal from './LinkedInImportModal';
 import LinkedInUpdateModal from './LinkedInUpdateModal';
 import ConferenceImportModal from './ConferenceImportModal';
@@ -28,9 +29,19 @@ import { findDuplicate, findDuplicates } from './dupeUtils';
 import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
 import './App.css';
 
+const TAB_KEY = 'nameApp_currentTab';
+
 function App() {
   const TAB_ORDER = ['activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
-  const [tab, setTab] = useState('activities');
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem(TAB_KEY);
+    return saved && TAB_ORDER.includes(saved) ? saved : 'activities';
+  });
+
+  // Persist tab to localStorage
+  useEffect(() => {
+    localStorage.setItem(TAB_KEY, tab);
+  }, [tab]);
   const [contacts, setContacts] = useState([]);
   const [stagedContacts, setStagedContacts] = useState([]);
   const [content, setContent] = useState([]);
@@ -49,6 +60,9 @@ function App() {
   const [linkedInUpdateContact, setLinkedInUpdateContact] = useState(null);
   const [pendingPaste, setPendingPaste] = useState(null);
   const [lastPasteIds, setLastPasteIds] = useState([]);
+  const [pendingStagedPaste, setPendingStagedPaste] = useState(null);
+  const [stagingDupeReviewQueue, setStagingDupeReviewQueue] = useState([]);
+  const [stagingPromoteReviewQueue, setStagingPromoteReviewQueue] = useState([]);
 
   const contactTableRef = useRef(null);
   const activityTableRef = useRef(null);
@@ -201,6 +215,94 @@ function App() {
       .catch(console.error);
   };
 
+  // --- Staging paste handlers ---
+  const handlePasteStagedContacts = (dataArray, headerMode) => {
+    setPendingStagedPaste({ rows: dataArray, headerMode: !!headerMode });
+  };
+
+  const handleConfirmStagedPaste = () => {
+    if (!pendingStagedPaste) return;
+    const { newRows, dupes } = findDuplicates(pendingStagedPaste.rows, contacts);
+    // Create non-dupes in staging
+    if (newRows.length > 0) {
+      createStagedContactsBatch(newRows)
+        .then(() => fetchStagedContacts().then(setStagedContacts))
+        .catch(console.error);
+    }
+    // Queue dupes for review
+    if (dupes.length > 0) {
+      setStagingDupeReviewQueue(dupes);
+    }
+    setPendingStagedPaste(null);
+  };
+
+  const handleCancelStagedPaste = () => setPendingStagedPaste(null);
+
+  const handleStagingDupeMerge = (existingId, mergedFields) => {
+    if (Object.keys(mergedFields).length === 0) return;
+    updateContact(existingId, mergedFields)
+      .then(updated => setContacts(prev => prev.map(c => c.id === updated.id ? updated : c)))
+      .catch(console.error);
+  };
+
+  const handleStagingDupeCreateAnyway = (incoming, existing) => {
+    // Create in staging with has_match status linking to the existing contact
+    createStagedContact({
+      ...incoming,
+      dupe_status: 'has_match',
+      matched_contact_id: existing.id,
+    })
+      .then(() => fetchStagedContacts().then(setStagedContacts))
+      .catch(console.error);
+  };
+
+  // --- Staging promote review handlers (for Promote Selected with has_match) ---
+  const handleReviewMatches = (matchPairs) => {
+    // matchPairs is array of { staged, matchedContact }
+    // Convert to format expected by MergeReviewModal: { incoming, existing, matchType }
+    const items = matchPairs.map(({ staged, matchedContact }) => ({
+      incoming: staged,
+      existing: matchedContact,
+      matchType: staged.li_url && matchedContact.li_url ? 'LinkedIn URL' : 'name match',
+    }));
+    setStagingPromoteReviewQueue(items);
+  };
+
+  const handlePromoteReviewMerge = (existingId, mergedFields, incoming) => {
+    // Use the promote endpoint with merge option to ensure CR activity automation
+    promoteStagedContact(incoming.id, { merge: true, merge_fields: mergedFields })
+      .then(result => {
+        setContacts(prev => prev.map(c => c.id === result.id ? result : c));
+        fetchStagedContacts().then(setStagedContacts).catch(console.error);
+        // Full refresh to ensure sync with DB
+        fetchContacts().then(setContacts).catch(console.error);
+        // Always refresh activities after promote (CR may have created one)
+        fetchActivities().then(setActivities).catch(console.error);
+      })
+      .catch(console.error);
+  };
+
+  const handlePromoteReviewSkip = () => {
+    // Skip means leave the staged contact as-is (don't delete, don't promote)
+    // Just advance to the next one
+  };
+
+  const handlePromoteReviewCreateAnyway = (incoming) => {
+    // Create as new contact (ignore the match)
+    promoteStagedContact(incoming.id, { merge: false })
+      .then(result => {
+        if (result.created) {
+          setContacts(prev => [...prev, result.created]);
+        }
+        fetchStagedContacts().then(setStagedContacts);
+        // Full refresh to ensure sync with DB
+        fetchContacts().then(setContacts).catch(console.error);
+        // Always refresh activities after promote (CR may have created one)
+        fetchActivities().then(setActivities).catch(console.error);
+      })
+      .catch(console.error);
+  };
+
   const handleDeleteContact = (id) => {
     if (!window.confirm('Delete this contact and all its activities?')) return;
     deleteContact(id)
@@ -257,6 +359,10 @@ function App() {
             ? prev.map(c => c.id === contact.id ? contact : c)
             : [...prev, contact];
         });
+        // Full refresh to ensure sync with DB
+        fetchContacts().then(setContacts).catch(console.error);
+        // Always refresh activities after promote (CR may have created one)
+        fetchActivities().then(setActivities).catch(console.error);
       })
       .catch(console.error);
   };
@@ -280,8 +386,11 @@ function App() {
           results.merged.forEach(m => { mergedMap[m.contact.id] = m.contact; });
           setContacts(prev => prev.map(c => mergedMap[c.id] || c));
         }
-        // Refetch staged to ensure consistency
+        // Full refresh to ensure sync with DB
         fetchStagedContacts().then(setStagedContacts).catch(console.error);
+        fetchContacts().then(setContacts).catch(console.error);
+        // Always refresh activities after promote (CR may have created one)
+        fetchActivities().then(setActivities).catch(console.error);
       })
       .catch(console.error);
   };
@@ -453,6 +562,15 @@ function App() {
             onPageBackward={handleMenuPageBackward}
           />
           <div className="app-bar-right">
+            {tab === 'contacts' && (
+              <button
+                className="cto-filter-btn"
+                onClick={() => contactTableRef.current?.setCtoFilter?.()}
+                title="Filter to CTO/CIO titles"
+              >
+                CTO/CIO
+              </button>
+            )}
             <input
               ref={searchInputRef}
               type="text"
@@ -495,8 +613,11 @@ function App() {
               onDeleteStagedContact={handleDeleteStagedContact}
               onPromoteStagedContact={handlePromoteStagedContact}
               onPromoteBatch={handlePromoteStagedBatch}
+              onReviewMatches={handleReviewMatches}
               onViewMatch={handleViewStagingMatch}
               onRefreshStagedContacts={() => fetchStagedContacts().then(setStagedContacts).catch(console.error)}
+              onPasteRows={handlePasteStagedContacts}
+              onNewActivity={handleNewActivityForContact}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -620,6 +741,38 @@ function App() {
             onClose={() => setDupeReviewQueue([])}
           />
         )}
+        {stagingDupeReviewQueue.length > 0 && (
+          <MergeReviewModal
+            items={stagingDupeReviewQueue}
+            title="Duplicate Review"
+            existingLabel="Existing Contact"
+            incomingLabel="Incoming"
+            mergeLabel="Apply Merge"
+            createLabel="Stage with Match"
+            skipLabel="Skip"
+            showSkip={true}
+            onMerge={handleStagingDupeMerge}
+            onSkip={() => {}}
+            onCreateAnyway={handleStagingDupeCreateAnyway}
+            onClose={() => setStagingDupeReviewQueue([])}
+          />
+        )}
+        {stagingPromoteReviewQueue.length > 0 && (
+          <MergeReviewModal
+            items={stagingPromoteReviewQueue}
+            title="Promote Review"
+            existingLabel="Existing Contact"
+            incomingLabel="Staged"
+            mergeLabel="Merge & Promote"
+            createLabel="Create New"
+            skipLabel="Skip"
+            showSkip={true}
+            onMerge={handlePromoteReviewMerge}
+            onSkip={handlePromoteReviewSkip}
+            onCreateAnyway={handlePromoteReviewCreateAnyway}
+            onClose={() => setStagingPromoteReviewQueue([])}
+          />
+        )}
         {stagingPromoteModal && (
           <StagingPromoteModal
             staged={stagingPromoteModal.staged}
@@ -635,6 +788,15 @@ function App() {
           onCancel={handleCancelPaste}
           onUndo={handleUndoPaste}
           onDismissUndo={handleDismissUndo}
+        />
+        <PasteConfirmBar
+          pendingPaste={pendingStagedPaste}
+          lastPasteCount={0}
+          onConfirm={handleConfirmStagedPaste}
+          onCancel={handleCancelStagedPaste}
+          onUndo={() => {}}
+          onDismissUndo={() => {}}
+          entityLabel="staged contacts"
         />
       </div>
     </AgGridProvider>

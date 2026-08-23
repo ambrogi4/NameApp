@@ -14,8 +14,11 @@ const StagingTable = forwardRef(function StagingTable({
   onDeleteStagedContact,
   onPromoteStagedContact,
   onPromoteBatch,
+  onReviewMatches,
   onViewMatch,
   onRefreshStagedContacts,
+  onPasteRows,
+  onNewActivity,
   quickFilterText,
 }, ref) {
   const gridRef = useRef(null);
@@ -70,6 +73,8 @@ const StagingTable = forwardRef(function StagingTable({
   onPromoteStagedContactRef.current = onPromoteStagedContact;
   const onViewMatchRef = useRef(onViewMatch);
   onViewMatchRef.current = onViewMatch;
+  const onNewActivityRef = useRef(onNewActivity);
+  onNewActivityRef.current = onNewActivity;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -142,14 +147,14 @@ const StagingTable = forwardRef(function StagingTable({
 
     if (ids.length === 0) return;
 
-    // Filter to contacts missing email AND having firm
+    // Filter to contacts: enrichment_status === 'new', missing email, having firm
     const eligibleIds = ids.filter(id => {
       const contact = stagedContacts.find(c => c.id === id);
-      return contact && !contact.email && contact.firm;
+      return contact && contact.enrichment_status === 'new' && !contact.email && contact.firm;
     });
 
     if (eligibleIds.length === 0) {
-      alert('No eligible contacts: all selected contacts either have an email or are missing a firm.');
+      alert('No eligible contacts: selected contacts must have enrichment status "new", be missing an email, and have a firm.');
       return;
     }
 
@@ -161,6 +166,13 @@ const StagingTable = forwardRef(function StagingTable({
       alert('Failed to guess emails: ' + err.message);
     }
   }, [selectedRows, stagedContacts, onRefreshStagedContacts]);
+
+  // Check if any selected rows are eligible for email guessing (status = 'new')
+  const anySelectedEligibleForGuess = useMemo(() => {
+    return selectedStagedContacts.some(c =>
+      c.enrichment_status === 'new' && !c.email && c.firm
+    );
+  }, [selectedStagedContacts]);
 
   // Build a map of contact IDs to contact data for fast lookup (use ref to avoid columnDefs recreation)
   const contactsByIdRef = useRef({});
@@ -349,6 +361,70 @@ const StagingTable = forwardRef(function StagingTable({
   }, [onUpdateStagedContact]);
 
   const containerRef = useRef(null);
+  const onPasteRowsRef = useRef(onPasteRows);
+  onPasteRowsRef.current = onPasteRows;
+
+  // Paste handler — batch mode (Ctrl+Shift+V)
+  const shiftPasteRef = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+        shiftPasteRef.current = true;
+      }
+    };
+
+    const handlePaste = (e) => {
+      if (!shiftPasteRef.current) return;
+      shiftPasteRef.current = false;
+
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const text = e.clipboardData?.getData('text/plain');
+      if (!text) return;
+
+      const rows = text.split('\n').filter(line => line.trim() !== '');
+      if (rows.length === 0) return;
+
+      e.preventDefault();
+
+      // Check if first row is a header (all non-empty values are known field names)
+      const positionalFields = ['first', 'last', 'title', 'firm', 'source', 'education',
+        'email', 'phone', 'street', 'city', 'state', 'zip', 'country',
+        'li_url', 'photo_url', 'tags', 'comment'];
+      const firstCols = rows[0].split('\t').map(v => v.trim().toLowerCase());
+      const nonEmpty = firstCols.filter(v => v !== '');
+      const headerMode = nonEmpty.length > 0 && nonEmpty.every(v => STAGED_CONTACT_FIELDS.includes(v));
+
+      const fields = headerMode ? firstCols : positionalFields;
+      const dataRows = headerMode ? rows.slice(1) : rows;
+
+      const parsedRows = [];
+      dataRows.forEach(row => {
+        const cols = row.split('\t');
+        const obj = {};
+        cols.forEach((val, i) => {
+          if (i < fields.length && fields[i] && val.trim() !== '') obj[fields[i]] = val.trim();
+        });
+        if (Object.keys(obj).length > 0) {
+          parsedRows.push(obj);
+        }
+      });
+      if (parsedRows.length > 0 && onPasteRowsRef.current) {
+        onPasteRowsRef.current(parsedRows, headerMode);
+      }
+    };
+
+    el.addEventListener('keydown', handleKeyDown);
+    el.addEventListener('paste', handlePaste);
+    return () => {
+      el.removeEventListener('keydown', handleKeyDown);
+      el.removeEventListener('paste', handlePaste);
+    };
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -433,6 +509,23 @@ const StagingTable = forwardRef(function StagingTable({
           }
         }
       }
+
+      // Alt+A: new activity for focused staged contact (uses matched contact if exists)
+      if (e.altKey && e.key === 'a') {
+        e.preventDefault();
+        const cell = gridRef.current?.api?.getFocusedCell();
+        if (cell) {
+          const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode && !rowNode.rowPinned) {
+            e.stopPropagation();
+            const staged = rowNode.data;
+            // If has_match, use the matched contact; otherwise pass staged data with name for display
+            if (staged.matched_contact_id && onNewActivityRef.current) {
+              onNewActivityRef.current({ id: staged.matched_contact_id, first: staged.first, last: staged.last });
+            }
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -464,18 +557,38 @@ const StagingTable = forwardRef(function StagingTable({
   }, [stagedContacts, onPromoteBatch]);
 
   const handlePromoteSelected = useCallback(() => {
-    const actions = selectedRows.map(id => {
+    if (selectedRows.length === 0) return;
+
+    // Separate has_match (need review) from no_match (direct create)
+    const hasMatchStaged = [];
+    const noMatchActions = [];
+
+    selectedRows.forEach(id => {
       const staged = stagedContacts.find(s => s.id === id);
-      return {
-        id,
-        action: staged?.dupe_status === 'has_match' ? 'merge' : 'create'
-      };
+      if (!staged) return;
+      if (staged.dupe_status === 'has_match' && staged.matched_contact_id) {
+        const matchedContact = contacts.find(c => c.id === staged.matched_contact_id);
+        if (matchedContact) {
+          hasMatchStaged.push({ staged, matchedContact });
+        }
+      } else {
+        noMatchActions.push({ id, action: 'create' });
+      }
     });
-    if (actions.length === 0) return;
-    onPromoteBatch(actions);
+
+    // Promote no_match records directly
+    if (noMatchActions.length > 0) {
+      onPromoteBatch(noMatchActions);
+    }
+
+    // Queue has_match records for duplicate review
+    if (hasMatchStaged.length > 0 && onReviewMatches) {
+      onReviewMatches(hasMatchStaged);
+    }
+
     setSelectedRows([]);
     gridRef.current?.api?.deselectAll();
-  }, [selectedRows, stagedContacts, onPromoteBatch]);
+  }, [selectedRows, stagedContacts, contacts, onPromoteBatch, onReviewMatches]);
 
   const handleSkipSelected = useCallback(() => {
     if (selectedRows.length === 0) return;
@@ -533,9 +646,11 @@ const StagingTable = forwardRef(function StagingTable({
               <button onClick={handleSkipSelected} className="delete-btn">
                 Skip Selected ({selectedRows.length})
               </button>
-              <button onClick={handleGuessEmail} className="edit-btn">
-                Guess Email
-              </button>
+              {anySelectedEligibleForGuess && (
+                <button onClick={handleGuessEmail} className="edit-btn">
+                  Guess Email
+                </button>
+              )}
             </>
           )}
           {selectedRows.length >= 2 && (

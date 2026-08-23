@@ -13,6 +13,31 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       const api = gridRef.current?.api;
       if (api) api.setFilterModel(null);
     },
+    setCtoFilter: () => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      // Patterns to match CTO/CIO titles:
+      // 1. "Chief Technology Officer" anywhere
+      // 2. "Chief Information Officer" anywhere
+      // 3. "CTO" standalone: at start, end, after comma/space, before comma/space (but NOT "cto" within "Director")
+      // 4. "CIO" standalone: same pattern
+      const patterns = [
+        'Chief Technology Officer',
+        'Chief Information Officer',
+        '(^|[\\s,])CTO($|[\\s,])',  // CTO at word boundary (not inside another word)
+        '(^|[\\s,])CIO($|[\\s,])',  // CIO at word boundary
+      ];
+      api.setFilterModel({
+        title: {
+          condition: {
+            operator: 'matchesAny',
+            term: JSON.stringify(patterns),
+            term2: '',
+          },
+          values: null,
+        },
+      });
+    },
     getApi: () => gridRef.current?.api,
     pageForward: () => {
       const api = gridRef.current?.api;

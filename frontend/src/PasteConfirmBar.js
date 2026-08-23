@@ -26,7 +26,7 @@ const btnBase = {
   fontSize: '13px',
 };
 
-export default function PasteConfirmBar({ pendingPaste, lastPasteCount, onConfirm, onCancel, onUndo, onDismissUndo }) {
+export default function PasteConfirmBar({ pendingPaste, lastPasteCount, onConfirm, onCancel, onUndo, onDismissUndo, entityLabel = 'contacts' }) {
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function PasteConfirmBar({ pendingPaste, lastPasteCount, onConfir
     const mode = pendingPaste.headerMode ? 'header-mapped' : 'positional';
     return (
       <div style={confirmStyle}>
-        <span>{n} row{n !== 1 ? 's' : ''} parsed ({mode}). Create contacts?</span>
+        <span>{n} row{n !== 1 ? 's' : ''} parsed ({mode}). Create {entityLabel}?</span>
         <button style={{ ...btnBase, background: '#4CAF50', color: 'white' }} onClick={onConfirm}>Create</button>
         <button style={{ ...btnBase, background: '#555', color: '#ddd' }} onClick={onCancel}>Cancel</button>
       </div>
@@ -51,7 +51,7 @@ export default function PasteConfirmBar({ pendingPaste, lastPasteCount, onConfir
   if (lastPasteCount > 0) {
     return (
       <div style={undoStyle}>
-        <span>Created {lastPasteCount} contact{lastPasteCount !== 1 ? 's' : ''}.</span>
+        <span>Created {lastPasteCount} {entityLabel.replace(/s$/, '')}{lastPasteCount !== 1 ? 's' : ''}.</span>
         <button style={{ ...btnBase, background: '#2196F3', color: 'white' }} onClick={onUndo}>Undo</button>
       </div>
     );

@@ -1,15 +1,22 @@
+from datetime import date
 from flask import Blueprint, request, jsonify
 
 from extensions import db
-from models import ContactStaging, Contact
+from models import ContactStaging, Contact, Activity
 from services.llm import call_claude
 
 staging_bp = Blueprint('staging', __name__)
 
-VALID_SOURCE_TYPES = {'linkedin_import', 'conference_import', 'manual', 'url_fetch', 'paste'}
+VALID_SOURCE_TYPES = {'linkedin_import', 'linkedin_import_cr', 'conference_import', 'manual', 'url_fetch', 'paste'}
+
+# Mapping from source_type to Contact.source field
+SOURCE_TYPE_TO_SOURCE = {
+    'linkedin_import': 'LinkedIn',
+    'linkedin_import_cr': 'LinkedInCR',
+}
 VALID_DUPE_STATUSES = {'pending', 'no_match', 'has_match', 'promoted', 'skipped'}
 VALID_EMAIL_CONFIDENCE = {'none', 'guessed', 'verified'}
-VALID_ENRICHMENT_STATUSES = {'pending', 'enriched', 'failed'}
+VALID_ENRICHMENT_STATUSES = {'new', 'pending', 'complete', 'enriched'}
 
 CONTACT_FIELDS = [
     'first', 'last', 'title', 'firm', 'source', 'education',
@@ -98,9 +105,16 @@ def promote_staged_contact(staging_id):
     - {} or no body: Create new contact
     - {"merge": true}: Merge with matched_contact_id (if exists)
     - {"merge_fields": {"field": "value"}}: Custom merge fields to matched contact
+
+    Automation:
+    - source_type 'linkedin_import' sets Contact.source = 'LinkedIn'
+    - source_type 'linkedin_import_cr' sets Contact.source = 'LinkedInCR'
+      and creates an Activity (channel=linkedin, topic='sent connection request')
     """
     staged = ContactStaging.query.get_or_404(staging_id)
+    source_type = staged.source_type
     data = request.get_json() or {}
+    created_activity = None
 
     if data.get('merge') and staged.matched_contact_id:
         # Merge into existing contact
@@ -118,16 +132,39 @@ def promote_staged_contact(staging_id):
             if hasattr(contact, field):
                 setattr(contact, field, value)
 
+        # Apply source from source_type (for CR automation)
+        _apply_source_from_source_type(contact, source_type)
+
         db.session.delete(staged)
+        db.session.flush()  # Ensure contact has ID before creating activity
+
+        # Create CR activity if applicable
+        created_activity = _create_cr_activity_if_needed(contact)
+
         db.session.commit()
-        return jsonify(contact.to_dict())
+        result = contact.to_dict()
+        if created_activity:
+            result['_created_activity_id'] = created_activity.id
+        return jsonify(result)
     else:
         # Create new contact
         contact = Contact(**staged.to_contact_dict())
+
+        # Apply source from source_type
+        _apply_source_from_source_type(contact, source_type)
+
         db.session.add(contact)
         db.session.delete(staged)
+        db.session.flush()  # Ensure contact has ID before creating activity
+
+        # Create CR activity if applicable
+        created_activity = _create_cr_activity_if_needed(contact)
+
         db.session.commit()
-        return jsonify(contact.to_dict()), 201
+        result = contact.to_dict()
+        if created_activity:
+            result['_created_activity_id'] = created_activity.id
+        return jsonify(result), 201
 
 
 @staging_bp.route('/promote-batch', methods=['POST'])
@@ -141,12 +178,20 @@ def promote_staged_contacts_batch():
       {"id": 2, "action": "merge"},
       {"id": 3, "action": "skip"}
     ]
+
+    Automation:
+    - source_type 'linkedin_import' sets Contact.source = 'LinkedIn'
+    - source_type 'linkedin_import_cr' sets Contact.source = 'LinkedInCR'
+      and creates an Activity (channel=linkedin, topic='sent connection request')
     """
     actions = request.get_json()
     if not isinstance(actions, list):
         return jsonify({'error': 'Expected a JSON array'}), 400
 
-    results = {'created': [], 'merged': [], 'skipped': [], 'errors': []}
+    results = {'created': [], 'merged': [], 'skipped': [], 'errors': [], 'activities_created': 0}
+
+    # Track contacts that need CR activity creation (after flush so IDs are available)
+    contacts_for_cr_activity = []
 
     try:
         for action in actions:
@@ -157,6 +202,8 @@ def promote_staged_contacts_batch():
             if not staged:
                 results['errors'].append({'id': staging_id, 'error': 'Not found'})
                 continue
+
+            source_type = staged.source_type  # Capture before deletion
 
             if action_type == 'skip':
                 db.session.delete(staged)
@@ -169,20 +216,40 @@ def promote_staged_contacts_batch():
                     for field, value in staged_dict.items():
                         if value and not getattr(contact, field):
                             setattr(contact, field, value)
+                    # Apply source from source_type
+                    _apply_source_from_source_type(contact, source_type)
                     db.session.delete(staged)
                     results['merged'].append({'staging_id': staging_id, 'contact': contact.to_dict()})
+                    # Queue for CR activity if applicable
+                    if contact.source == 'LinkedInCR':
+                        contacts_for_cr_activity.append(contact)
                 else:
                     # Matched contact was deleted, create new instead
                     contact = Contact(**staged.to_contact_dict())
+                    _apply_source_from_source_type(contact, source_type)
                     db.session.add(contact)
                     db.session.delete(staged)
                     results['created'].append(contact.to_dict())
+                    if contact.source == 'LinkedInCR':
+                        contacts_for_cr_activity.append(contact)
 
             else:  # 'create' or fallback
                 contact = Contact(**staged.to_contact_dict())
+                _apply_source_from_source_type(contact, source_type)
                 db.session.add(contact)
                 db.session.delete(staged)
                 results['created'].append(contact.to_dict())
+                if contact.source == 'LinkedInCR':
+                    contacts_for_cr_activity.append(contact)
+
+        # Flush to get contact IDs for new contacts
+        db.session.flush()
+
+        # Create CR activities for all applicable contacts
+        for contact in contacts_for_cr_activity:
+            activity = _create_cr_activity_if_needed(contact)
+            if activity:
+                results['activities_created'] += 1
 
         db.session.commit()
     except Exception as e:
@@ -240,7 +307,7 @@ def _create_staged_from_data(data):
         index_2=data.get('index_2'),
         source_type=data.get('source_type'),
         email_confidence=data.get('email_confidence', 'none'),
-        enrichment_status=data.get('enrichment_status', 'pending'),
+        enrichment_status=data.get('enrichment_status', 'new'),
     )
 
     # Run dupe detection
@@ -291,15 +358,55 @@ If you cannot determine the domain, return {"email": null, "error": "..."}'''
     return call_claude(system_prompt, user_content, max_tokens=100)
 
 
+def _apply_source_from_source_type(contact, source_type):
+    """Set Contact.source based on source_type if not already set."""
+    if contact.source:
+        return  # Don't overwrite existing source
+    mapped_source = SOURCE_TYPE_TO_SOURCE.get(source_type)
+    if mapped_source:
+        contact.source = mapped_source
+
+
+def _create_cr_activity_if_needed(contact):
+    """Create connection request activity if contact.source is LinkedInCR."""
+    if contact.source != 'LinkedInCR':
+        return None
+    activity = Activity(
+        contact_id=contact.id,
+        content_id=None,
+        activity_date=date.today(),
+        channel='linkedin',
+        topic='sent connection request',
+        contact_responded=False,
+        email_opened=False,
+        in_crm=False,
+    )
+    db.session.add(activity)
+    return activity
+
+
 @staging_bp.route('/guess-emails', methods=['POST'])
 def guess_staged_emails():
-    """Guess email addresses for staged contacts using LLM."""
+    """Guess email addresses for staged contacts using LLM.
+
+    Status workflow:
+    - new: record just arrived, eligible for guessing
+    - pending: guess in progress
+    - complete: guess attempted, no valid email found
+    - enriched: guess successful, email populated
+    """
     data = request.get_json()
     ids = data.get('ids', [])
     if not ids:
         return jsonify({'error': 'No IDs provided'}), 400
 
     staged_list = ContactStaging.query.filter(ContactStaging.id.in_(ids)).all()
+
+    # Set all to 'pending' immediately
+    for staged in staged_list:
+        staged.enrichment_status = 'pending'
+    db.session.commit()
+
     results = []
 
     for staged in staged_list:
@@ -308,6 +415,7 @@ def guess_staged_emails():
         firm = (staged.firm or '').strip()
 
         if not first or not last:
+            staged.enrichment_status = 'complete'
             results.append({
                 'id': staged.id,
                 'email': None,
@@ -317,6 +425,7 @@ def guess_staged_emails():
             continue
 
         if not firm:
+            staged.enrichment_status = 'complete'
             results.append({
                 'id': staged.id,
                 'email': None,
@@ -339,6 +448,7 @@ def guess_staged_emails():
                     'success': True
                 })
             else:
+                staged.enrichment_status = 'complete'
                 results.append({
                     'id': staged.id,
                     'email': None,
@@ -346,6 +456,7 @@ def guess_staged_emails():
                     'success': False
                 })
         except Exception as e:
+            staged.enrichment_status = 'complete'
             results.append({
                 'id': staged.id,
                 'email': None,

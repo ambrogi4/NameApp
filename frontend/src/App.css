@@ -207,6 +207,22 @@
   background: #d0d0d0;
 }
 
+.cto-filter-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  background: #1976D2;
+  color: white;
+  border: 1px solid #1565C0;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cto-filter-btn:hover {
+  background: #1565C0;
+}
+
 /* Global Lookup Overlay */
 .lookup-overlay {
   position: fixed;

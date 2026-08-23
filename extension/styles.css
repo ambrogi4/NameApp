@@ -39,6 +39,11 @@ button {
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
+  margin-bottom: 8px;
+}
+
+button:last-of-type {
+  margin-bottom: 0;
 }
 
 button:hover {
@@ -48,6 +53,32 @@ button:hover {
 button:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+button.cr-btn {
+  background: #388e3c;
+}
+
+button.cr-btn:hover {
+  background: #2e7d32;
+}
+
+#crComment {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 40px;
+}
+
+#crComment:focus {
+  outline: none;
+  border-color: #388e3c;
 }
 
 #result {

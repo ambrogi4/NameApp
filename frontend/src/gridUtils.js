@@ -2,10 +2,10 @@ export const CHANNELS = ['linkedin', 'email', 'phone', 'text', 'in_person', 'oth
 export const CONTENT_TYPES = ['pdf', 'youtube', 'article', 'podcast', 'webinar'];
 
 // Staging enums
-export const SOURCE_TYPES = ['linkedin_import', 'conference_import', 'manual', 'url_fetch', 'paste'];
+export const SOURCE_TYPES = ['linkedin_import', 'linkedin_import_cr', 'conference_import', 'manual', 'url_fetch', 'paste'];
 export const DUPE_STATUSES = ['pending', 'no_match', 'has_match', 'promoted', 'skipped'];
 export const EMAIL_CONFIDENCE_LEVELS = ['none', 'guessed', 'verified'];
-export const ENRICHMENT_STATUSES = ['pending', 'enriched', 'failed'];
+export const ENRICHMENT_STATUSES = ['new', 'pending', 'complete', 'enriched'];
 
 export const CONTACT_FIELDS = [
   'first', 'last', 'title', 'firm', 'source', 'education',

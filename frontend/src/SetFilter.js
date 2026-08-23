@@ -25,6 +25,7 @@ const OPERATORS = {
     { value: 'notEqual', label: 'Text is not' },
     { value: 'startsWith', label: 'Starts with' },
     { value: 'endsWith', label: 'Ends with' },
+    { value: 'matchesAny', label: 'Matches any pattern' },
     { value: 'blank', label: 'Is empty' },
     { value: 'notBlank', label: 'Is not empty' },
   ],
@@ -61,7 +62,7 @@ const OPERATORS = {
 };
 
 const NEEDS_ONE = new Set([
-  'contains', 'notContains', 'equals', 'notEqual', 'startsWith', 'endsWith',
+  'contains', 'notContains', 'equals', 'notEqual', 'startsWith', 'endsWith', 'matchesAny',
   'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
   'dateIs', 'dateBefore', 'dateAfter', 'dateOnOrBefore', 'dateOnOrAfter',
 ]);
@@ -103,6 +104,13 @@ function passesCondition(raw, condition) {
   if (operator === 'notEqual') return lower !== t1;
   if (operator === 'startsWith') return lower.startsWith(t1);
   if (operator === 'endsWith') return lower.endsWith(t1);
+  if (operator === 'matchesAny') {
+    // term is a JSON array of regex patterns; match if any pattern matches (case-insensitive)
+    try {
+      const patterns = JSON.parse(term || '[]');
+      return patterns.some(p => new RegExp(p, 'i').test(str));
+    } catch { return false; }
+  }
 
   const num = parseFloat(str);
   const n1 = parseFloat(term || '');
