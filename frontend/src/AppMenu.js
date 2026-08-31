@@ -11,6 +11,8 @@ const AppMenu = ({
   onLinkedInImport,
   onConferenceImport,
   onLinkedInUpdate,
+  onProfileSearch,
+  onSoftRefresh,
   onPaste,
   onCopy,
   onPageForward,
@@ -56,6 +58,7 @@ const AppMenu = ({
 
   const isGridTab = tab === 'contacts' || tab === 'activities' || tab === 'content';
   const isContactsTab = tab === 'contacts';
+  const isStagingTab = tab === 'staging';
   const hasUrlColumn = tab === 'contacts' || tab === 'content';
 
   return (
@@ -193,6 +196,20 @@ const AppMenu = ({
               shortcut="Alt+D"
               disabled={!isContactsTab}
               onClick={() => executeAction(onLinkedInUpdate, !isContactsTab)}
+              indent
+            />
+            <MenuItem
+              label="Profile Search"
+              shortcut="Alt+P"
+              disabled={!isStagingTab}
+              onClick={() => executeAction(onProfileSearch, !isStagingTab)}
+              indent
+            />
+            <MenuItem
+              label="Soft Refresh"
+              shortcut="Alt+J"
+              disabled={!isStagingTab}
+              onClick={() => executeAction(onSoftRefresh, !isStagingTab)}
               indent
             />
             <MenuItem

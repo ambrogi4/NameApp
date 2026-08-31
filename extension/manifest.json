@@ -26,6 +26,21 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:5000/*",
+        "http://localhost:5001/*",
+        "http://localhost:5002/*",
+        "http://localhost:5003/*",
+        "http://100.121.134.27:5000/*",
+        "http://100.121.134.27:5001/*",
+        "http://100.121.134.27:5002/*",
+        "http://100.121.134.27:5003/*"
+      ],
+      "js": ["content-mycrm.js"]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

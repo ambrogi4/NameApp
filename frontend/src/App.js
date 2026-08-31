@@ -103,6 +103,14 @@ function App() {
       if (e.key === 'n') { e.preventDefault(); setTab('content'); return; }
       if (e.key === 'f') { e.preventDefault(); setTab('filter'); return; }
       if (e.key === 'r') { e.preventDefault(); setTab('reports'); return; }
+      // Alt+J: soft refresh for staging (J for "reJresh" or just available key)
+      if (e.key === 'j') {
+        e.preventDefault();
+        if (tab === 'staging') {
+          fetchStagedContacts().then(setStagedContacts).catch(console.error);
+        }
+        return;
+      }
       // Alt+Up/Down: sequential cycling
       const idx = TAB_ORDER.indexOf(tab);
       if (e.key === 'ArrowUp' && idx > 0) {
@@ -403,6 +411,14 @@ function App() {
     }
   };
 
+  const handleProfileSearch = useCallback(() => {
+    stagingTableRef.current?.triggerProfileSearch?.();
+  }, []);
+
+  const handleSoftRefresh = useCallback(() => {
+    stagingTableRef.current?.softRefresh?.();
+  }, []);
+
   // --- Content handlers ---
   const handleCreateContent = (data) => {
     createContent(data)
@@ -556,6 +572,8 @@ function App() {
             onLinkedInImport={() => setShowLinkedInImport(true)}
             onConferenceImport={() => setShowConferenceImport(true)}
             onLinkedInUpdate={handleMenuLinkedInUpdate}
+            onProfileSearch={handleProfileSearch}
+            onSoftRefresh={handleSoftRefresh}
             onPaste={handleMenuPaste}
             onCopy={handleMenuCopy}
             onPageForward={handleMenuPageForward}
@@ -618,6 +636,7 @@ function App() {
               onRefreshStagedContacts={() => fetchStagedContacts().then(setStagedContacts).catch(console.error)}
               onPasteRows={handlePasteStagedContacts}
               onNewActivity={handleNewActivityForContact}
+              onConferenceImport={() => setShowConferenceImport(true)}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -629,12 +648,6 @@ function App() {
                 style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 LinkedIn Import
-              </button>
-              <button
-                onClick={() => setShowConferenceImport(true)}
-                style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                Conference Import
               </button>
             </div>
             <ContactTable

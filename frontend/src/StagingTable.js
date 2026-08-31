@@ -19,6 +19,7 @@ const StagingTable = forwardRef(function StagingTable({
   onRefreshStagedContacts,
   onPasteRows,
   onNewActivity,
+  onConferenceImport,
   quickFilterText,
 }, ref) {
   const gridRef = useRef(null);
@@ -61,6 +62,54 @@ const StagingTable = forwardRef(function StagingTable({
         }
       }
     },
+    softRefresh: () => {
+      onRefreshStagedContactsRef.current?.();
+    },
+    triggerProfileSearch: () => {
+      // First check for pending profile update
+      const PENDING_UPDATE_KEY = 'nameApp_pendingProfileUpdate';
+      const pendingUpdate = localStorage.getItem(PENDING_UPDATE_KEY);
+      if (pendingUpdate) {
+        try {
+          const data = JSON.parse(pendingUpdate);
+          if (data && data.stagedId && data.profileData) {
+            window.dispatchEvent(new CustomEvent('nameAppProfileUpdate', { detail: data }));
+            localStorage.removeItem(PENDING_UPDATE_KEY);
+            return;
+          }
+        } catch (err) {
+          console.error('Error parsing pending update:', err);
+        }
+      }
+
+      // No pending update, do LinkedIn search
+      const api = gridRef.current?.api;
+      if (!api) return;
+      const cell = api.getFocusedCell();
+      if (cell && !cell.rowPinned) {
+        const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+        if (rowNode?.data) {
+          const staged = rowNode.data;
+          // Store in localStorage for Chrome extension to pick up
+          const pendingData = {
+            id: staged.id,
+            first: staged.first || '',
+            last: staged.last || '',
+            title: staged.title || '',
+            firm: staged.firm || '',
+            city: staged.city || '',
+            state: staged.state || '',
+            education: staged.education || '',
+            li_url: staged.li_url || '',
+          };
+          localStorage.setItem('nameApp_pendingStagedContact', JSON.stringify(pendingData));
+          // Build LinkedIn search URL
+          const keywords = [staged.first, staged.last, staged.firm].filter(Boolean).join(' ');
+          const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
+          window.open(searchUrl, '_blank');
+        }
+      }
+    },
   }));
 
   const [newRow, setNewRow] = useState(createEmptyRow(STAGED_CONTACT_FIELDS, { source_type: 'manual' }));
@@ -75,6 +124,8 @@ const StagingTable = forwardRef(function StagingTable({
   onViewMatchRef.current = onViewMatch;
   const onNewActivityRef = useRef(onNewActivity);
   onNewActivityRef.current = onNewActivity;
+  const onRefreshStagedContactsRef = useRef(onRefreshStagedContacts);
+  onRefreshStagedContactsRef.current = onRefreshStagedContacts;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -186,6 +237,7 @@ const StagingTable = forwardRef(function StagingTable({
     {
       checkboxSelection: true,
       headerCheckboxSelection: true,
+      headerCheckboxSelectionFilteredOnly: true,
       width: 50,
       pinned: 'left',
       sortable: false,
@@ -431,6 +483,7 @@ const StagingTable = forwardRef(function StagingTable({
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
       if (!containerRef.current?.offsetParent) return;
 
       // Ctrl+C: copy
@@ -493,19 +546,55 @@ const StagingTable = forwardRef(function StagingTable({
         return;
       }
 
-      // Alt+P: promote focused row
+      // Alt+P: profile search OR apply pending update
+      // If there's a pending profile update, dispatch event to show modal
+      // Otherwise, open LinkedIn search with staged contact's name/firm
       if (e.altKey && e.key === 'p') {
         e.preventDefault();
-        const cell = gridRef.current?.api?.getFocusedCell();
-        if (cell) {
-          const rowNode = gridRef.current.api.getDisplayedRowAtIndex(cell.rowIndex);
-          if (rowNode && !rowNode.rowPinned) {
-            const staged = rowNode.data;
-            if (staged.dupe_status === 'has_match') {
-              onViewMatchRef.current?.(staged);
-            } else {
-              onPromoteStagedContactRef.current(staged.id, {});
+
+        // First check for pending profile update
+        const PENDING_UPDATE_KEY = 'nameApp_pendingProfileUpdate';
+        const pendingUpdate = localStorage.getItem(PENDING_UPDATE_KEY);
+        if (pendingUpdate) {
+          try {
+            const data = JSON.parse(pendingUpdate);
+            if (data && data.stagedId && data.profileData) {
+              // Dispatch event for App.js to handle
+              window.dispatchEvent(new CustomEvent('nameAppProfileUpdate', { detail: data }));
+              localStorage.removeItem(PENDING_UPDATE_KEY);
+              return;
             }
+          } catch (err) {
+            console.error('Error parsing pending update:', err);
+          }
+        }
+
+        // No pending update, do LinkedIn search
+        const api = gridRef.current?.api;
+        if (!api) return;
+        const cell = api.getFocusedCell();
+        if (cell && !cell.rowPinned) {
+          const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+          if (rowNode?.data) {
+            const staged = rowNode.data;
+            // Store in localStorage for Chrome extension to pick up
+            const pendingData = {
+              id: staged.id,
+              first: staged.first || '',
+              last: staged.last || '',
+              title: staged.title || '',
+              firm: staged.firm || '',
+              city: staged.city || '',
+              state: staged.state || '',
+              education: staged.education || '',
+              li_url: staged.li_url || '',
+            };
+            localStorage.setItem('nameApp_pendingStagedContact', JSON.stringify(pendingData));
+            console.log('[NameApp] Stored staged contact for extension:', pendingData);
+            // Build LinkedIn search URL
+            const keywords = [staged.first, staged.last, staged.firm].filter(Boolean).join(' ');
+            const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
+            window.open(searchUrl, '_blank');
           }
         }
       }
@@ -623,8 +712,14 @@ const StagingTable = forwardRef(function StagingTable({
 
   return (
     <div>
-      <div className="staging-summary" style={{ marginBottom: '8px', fontSize: '14px', color: '#666' }}>
-        {stagedContacts.length} staged | {noMatchCount} no match | {hasMatchCount} has match
+      <div className="staging-summary" style={{ marginBottom: '8px', fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center', position: 'relative' }}>
+        <button
+          onClick={onConferenceImport}
+          style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', position: 'absolute', left: 0 }}
+        >
+          Conference Import
+        </button>
+        <span style={{ width: '100%', textAlign: 'center' }}>{stagedContacts.length} staged | {noMatchCount} no match | {hasMatchCount} has match</span>
       </div>
       {(newRowHasData || selectedRows.length > 0 || noMatchCount > 0) && (
         <div className="contact-toolbar">

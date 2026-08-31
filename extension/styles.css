@@ -93,3 +93,9 @@ button.cr-btn:hover {
 #result:empty {
   display: none;
 }
+
+.divider {
+  height: 1px;
+  background: #ddd;
+  margin: 12px 0;
+}
