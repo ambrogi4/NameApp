@@ -25,9 +25,12 @@ class Contact(db.Model):
     in_crm = db.Column(db.Boolean, default=False)
     index_1 = db.Column(db.Integer)
     index_2 = db.Column(db.Integer)
+    outreach_category = db.Column(db.Text)  # cold, nurture, partner, existing, internal, admin
 
     activities = db.relationship('Activity', backref='contact',
                                  cascade='all, delete-orphan')
+    oc_transitions = db.relationship('OcTransition', backref='contact',
+                                     cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -53,6 +56,7 @@ class Contact(db.Model):
             'in_crm': self.in_crm,
             'index_1': self.index_1,
             'index_2': self.index_2,
+            'outreach_category': self.outreach_category,
         }
 
 
@@ -83,6 +87,7 @@ class ContactStaging(db.Model):
     in_crm = db.Column(db.Boolean, default=False)
     index_1 = db.Column(db.Integer)
     index_2 = db.Column(db.Integer)
+    outreach_category = db.Column(db.Text)  # cold, nurture, partner, existing, internal, admin
 
     # Staging-specific columns
     source_type = db.Column(db.Text)  # linkedin_import, conference_import, manual, url_fetch, paste
@@ -118,6 +123,7 @@ class ContactStaging(db.Model):
             'in_crm': self.in_crm,
             'index_1': self.index_1,
             'index_2': self.index_2,
+            'outreach_category': self.outreach_category,
             # Staging-specific
             'source_type': self.source_type,
             'dupe_status': self.dupe_status,
@@ -149,6 +155,7 @@ class ContactStaging(db.Model):
             'in_crm': self.in_crm,
             'index_1': self.index_1,
             'index_2': self.index_2,
+            'outreach_category': self.outreach_category,
         }
 
 
@@ -191,6 +198,7 @@ class Activity(db.Model):
     comment = db.Column(db.Text)
     in_crm = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    outreach_category = db.Column(db.Text)  # snapshot from contact at creation time
 
     content = db.relationship('Content', backref='activities')
 
@@ -206,5 +214,34 @@ class Activity(db.Model):
             'topic': self.topic,
             'comment': self.comment,
             'in_crm': self.in_crm,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'outreach_category': self.outreach_category,
+        }
+
+
+class OcTransition(db.Model):
+    """Tracks transitions between outreach categories, especially cold -> nurture."""
+    __tablename__ = 'oc_transition'
+
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contact.id', ondelete='CASCADE'), nullable=False)
+    from_oc = db.Column(db.Text, nullable=False)
+    to_oc = db.Column(db.Text, nullable=False)
+    transition_date = db.Column(db.Date, nullable=False)
+    comment = db.Column(db.Text)
+    last_activity_id = db.Column(db.Integer, db.ForeignKey('activity.id', ondelete='SET NULL'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    last_activity = db.relationship('Activity', foreign_keys=[last_activity_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'contact_id': self.contact_id,
+            'from_oc': self.from_oc,
+            'to_oc': self.to_oc,
+            'transition_date': self.transition_date.isoformat() if self.transition_date else None,
+            'comment': self.comment,
+            'last_activity_id': self.last_activity_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

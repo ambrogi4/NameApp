@@ -1,6 +1,9 @@
 export const CHANNELS = ['linkedin', 'email', 'phone', 'text', 'in_person', 'other'];
 export const CONTENT_TYPES = ['pdf', 'youtube', 'article', 'podcast', 'webinar'];
 
+// Outreach categories (in display order: sales-relevant first)
+export const OUTREACH_CATEGORIES = ['cold', 'nurture', 'partner', 'existing', 'internal', 'admin'];
+
 // Staging enums
 export const SOURCE_TYPES = ['linkedin_import', 'linkedin_import_cr', 'conference_import', 'manual', 'url_fetch', 'paste'];
 export const DUPE_STATUSES = ['pending', 'no_match', 'has_match', 'promoted', 'skipped'];
@@ -8,7 +11,7 @@ export const EMAIL_CONFIDENCE_LEVELS = ['none', 'guessed', 'verified'];
 export const ENRICHMENT_STATUSES = ['new', 'pending', 'complete', 'enriched'];
 
 export const CONTACT_FIELDS = [
-  'first', 'last', 'title', 'firm', 'source', 'education',
+  'first', 'last', 'title', 'firm', 'source', 'outreach_category', 'education',
   'tags', 'comment', 'email', 'phone', 'street', 'city',
   'state', 'zip', 'country', 'li_url', 'photo_url',
   'in_crm', 'index_1', 'index_2',
@@ -17,6 +20,7 @@ export const CONTACT_FIELDS = [
 export const ACTIVITY_FIELDS = [
   'contact_id', 'content_id', 'activity_date', 'channel',
   'contact_responded', 'email_opened', 'topic', 'comment', 'in_crm',
+  'outreach_category',
 ];
 
 export const CONTENT_FIELDS = [

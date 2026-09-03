@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
-import { CONTACT_FIELDS, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
+import { CONTACT_FIELDS, OUTREACH_CATEGORIES, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
-const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, quickFilterText, lookupMode, onDismiss }, ref) {
+const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, onSelectionChange, quickFilterText, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -111,6 +111,8 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
   onDismissRef.current = onDismiss;
   const onLinkedInUpdateRef = useRef(onLinkedInUpdate);
   onLinkedInUpdateRef.current = onLinkedInUpdate;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -207,6 +209,14 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       headerName: 'Details',
       children: [
         { field: 'source', width: 100, editable: true },
+        {
+          field: 'outreach_category',
+          headerName: 'OC',
+          width: 90,
+          editable: true,
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: ['', ...OUTREACH_CATEGORIES] },
+        },
         { field: 'tags', width: 120, editable: true },
         { field: 'education', width: 120, editable: true, columnGroupShow: 'open' },
         { field: 'comment', width: 160, editable: true, columnGroupShow: 'open' },
@@ -426,8 +436,8 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
         }
       }
 
-      // Alt+D: open LinkedIn update modal for focused contact
-      if (e.altKey && e.key === 'd') {
+      // Alt+Q: open LinkedIn update modal for focused contact (was Alt+D, now D is for Dashboard)
+      if (e.altKey && e.key === 'q') {
         e.preventDefault();
         const cell = gridRef.current?.api?.getFocusedCell();
         if (cell) {
@@ -462,6 +472,9 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       .map(n => n.data.id)
       .filter(id => id != null);
     setSelectedRows(ids);
+    if (onSelectionChangeRef.current) {
+      onSelectionChangeRef.current(ids);
+    }
   }, []);
 
   const pinnedBottomRowData = useMemo(() => lookupMode ? undefined : [newRow], [newRow, lookupMode]);

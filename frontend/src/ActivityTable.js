@@ -306,6 +306,12 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
       editable: true,
       cellDataType: 'boolean',
     },
+    {
+      field: 'outreach_category',
+      headerName: 'OC',
+      width: 80,
+      editable: false,  // Snapshot from contact, read-only
+    },
   ], []);
 
   const defaultColDef = useMemo(() => ({

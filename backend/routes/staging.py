@@ -22,8 +22,10 @@ CONTACT_FIELDS = [
     'first', 'last', 'title', 'firm', 'source', 'education',
     'tags', 'comment', 'email', 'phone', 'street', 'city',
     'state', 'zip', 'country', 'li_url', 'photo_url',
-    'in_crm', 'index_1', 'index_2'
+    'in_crm', 'index_1', 'index_2', 'outreach_category'
 ]
+
+VALID_OUTREACH_CATEGORIES = {'cold', 'nurture', 'partner', 'existing', 'internal', 'admin'}
 
 STAGING_FIELDS = [
     'source_type', 'dupe_status', 'matched_contact_id',
@@ -112,6 +114,11 @@ def promote_staged_contact(staging_id):
       and creates an Activity (channel=linkedin, topic='sent connection request')
     """
     staged = ContactStaging.query.get_or_404(staging_id)
+
+    # Validate outreach_category is set
+    if not staged.outreach_category:
+        return jsonify({'error': 'Outreach Category required before promotion'}), 400
+
     source_type = staged.source_type
     data = request.get_json() or {}
     created_activity = None
@@ -201,6 +208,14 @@ def promote_staged_contacts_batch():
             staged = ContactStaging.query.get(staging_id)
             if not staged:
                 results['errors'].append({'id': staging_id, 'error': 'Not found'})
+                continue
+
+            # Validate outreach_category for non-skip actions
+            if action_type != 'skip' and not staged.outreach_category:
+                results['errors'].append({
+                    'id': staging_id,
+                    'error': 'Outreach Category required before promotion'
+                })
                 continue
 
             source_type = staged.source_type  # Capture before deletion
@@ -305,6 +320,7 @@ def _create_staged_from_data(data):
         in_crm=data.get('in_crm', False),
         index_1=data.get('index_1'),
         index_2=data.get('index_2'),
+        outreach_category=data.get('outreach_category'),
         source_type=data.get('source_type'),
         email_confidence=data.get('email_confidence', 'none'),
         enrichment_status=data.get('enrichment_status', 'new'),
@@ -380,9 +396,36 @@ def _create_cr_activity_if_needed(contact):
         contact_responded=False,
         email_opened=False,
         in_crm=False,
+        outreach_category=contact.outreach_category,  # Snapshot from contact
     )
     db.session.add(activity)
     return activity
+
+
+@staging_bp.route('/bulk-oc', methods=['PUT'])
+def set_bulk_outreach_category():
+    """Set outreach_category for multiple staged contacts at once."""
+    data = request.get_json()
+    ids = data.get('ids', [])
+    outreach_category = data.get('outreach_category')
+
+    if not ids:
+        return jsonify({'error': 'No IDs provided'}), 400
+
+    if outreach_category and outreach_category not in VALID_OUTREACH_CATEGORIES:
+        return jsonify({
+            'error': f'outreach_category must be one of {sorted(VALID_OUTREACH_CATEGORIES)}'
+        }), 400
+
+    staged_list = ContactStaging.query.filter(ContactStaging.id.in_(ids)).all()
+    updated = []
+
+    for staged in staged_list:
+        staged.outreach_category = outreach_category
+        updated.append(staged.to_dict())
+
+    db.session.commit()
+    return jsonify({'updated': updated})
 
 
 @staging_bp.route('/guess-emails', methods=['POST'])

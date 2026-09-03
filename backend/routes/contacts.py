@@ -39,6 +39,7 @@ def create_contact():
         in_crm=data.get('in_crm', False),
         index_1=data.get('index_1'),
         index_2=data.get('index_2'),
+        outreach_category=data.get('outreach_category'),
     )
     db.session.add(contact)
     db.session.commit()
@@ -74,6 +75,7 @@ def create_contacts_batch():
                 in_crm=data.get('in_crm', False),
                 index_1=data.get('index_1'),
                 index_2=data.get('index_2'),
+                outreach_category=data.get('outreach_category'),
             )
             db.session.add(contact)
             created.append(contact)
@@ -91,7 +93,7 @@ def update_contact(contact_id):
     for field in ['first', 'last', 'title', 'firm', 'source', 'education',
                   'tags', 'comment', 'email', 'phone', 'street', 'city',
                   'state', 'zip', 'country', 'li_url', 'photo_url',
-                  'in_crm', 'index_1', 'index_2']:
+                  'in_crm', 'index_1', 'index_2', 'outreach_category']:
         if field in data:
             setattr(contact, field, data[field])
     db.session.commit()

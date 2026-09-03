@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AllCommunityModule } from 'ag-grid-community';
 import { AgGridProvider } from 'ag-grid-react';
 import {
@@ -8,6 +8,7 @@ import {
   fetchActivities, createActivity, updateActivity, deleteActivity,
   fetchStagedContacts, createStagedContact, createStagedContactsBatch,
   updateStagedContact, deleteStagedContact, promoteStagedContact, promoteStagedContactsBatch,
+  fetchDashboardMetrics,
 } from './apiService';
 import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
@@ -24,6 +25,8 @@ import ConferenceImportModal from './ConferenceImportModal';
 import PasteConfirmBar from './PasteConfirmBar';
 import FancyFilterPage from './FancyFilterPage';
 import ReportsPage from './ReportsPage';
+import DashboardPage from './DashboardPage';
+import ColdToNurtureModal from './ColdToNurtureModal';
 import AppMenu from './AppMenu';
 import { findDuplicate, findDuplicates } from './dupeUtils';
 import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
@@ -32,10 +35,10 @@ import './App.css';
 const TAB_KEY = 'nameApp_currentTab';
 
 function App() {
-  const TAB_ORDER = ['activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
+  const TAB_ORDER = ['dashboard', 'activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
   const [tab, setTab] = useState(() => {
     const saved = localStorage.getItem(TAB_KEY);
-    return saved && TAB_ORDER.includes(saved) ? saved : 'activities';
+    return saved && TAB_ORDER.includes(saved) ? saved : 'dashboard';
   });
 
   // Persist tab to localStorage
@@ -63,8 +66,12 @@ function App() {
   const [pendingStagedPaste, setPendingStagedPaste] = useState(null);
   const [stagingDupeReviewQueue, setStagingDupeReviewQueue] = useState([]);
   const [stagingPromoteReviewQueue, setStagingPromoteReviewQueue] = useState([]);
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
+  const [coldToNurtureContact, setColdToNurtureContact] = useState(null);
+  const [selectedContactForOC, setSelectedContactForOC] = useState(null);
 
   const contactTableRef = useRef(null);
+  const dashboardRef = useRef(null);
   const activityTableRef = useRef(null);
   const contentTableRef = useRef(null);
   const stagingTableRef = useRef(null);
@@ -97,6 +104,7 @@ function App() {
       // Alt+X: Clear all filters
       if (e.key === 'x') { e.preventDefault(); handleClearAllFilters(); return; }
       // Direct tab shortcuts
+      if (e.key === 'd') { e.preventDefault(); setTab('dashboard'); return; }
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
       if (e.key === 't') { e.preventDefault(); setTab('staging'); return; }
       if (e.key === 'c') { e.preventDefault(); setTab('contacts'); return; }
@@ -135,6 +143,7 @@ function App() {
     fetchStagedContacts().then(setStagedContacts).catch(console.error);
     fetchContent().then(setContent).catch(console.error);
     fetchActivities().then(setActivities).catch(console.error);
+    fetchDashboardMetrics().then(setDashboardMetrics).catch(console.error);
   }, []);
 
   // --- Contact handlers ---
@@ -419,6 +428,40 @@ function App() {
     stagingTableRef.current?.softRefresh?.();
   }, []);
 
+  // Cold→Nurture handler
+  const handleColdToNurtureClick = useCallback(() => {
+    const api = contactTableRef.current?.getApi?.();
+    if (!api) return;
+    const selectedNodes = api.getSelectedNodes().filter(n => !n.rowPinned);
+    if (selectedNodes.length === 1) {
+      const contact = selectedNodes[0].data;
+      if (contact.outreach_category === 'cold') {
+        setColdToNurtureContact(contact);
+      }
+    }
+  }, []);
+
+  const handleColdToNurtureSuccess = useCallback(() => {
+    setColdToNurtureContact(null);
+    fetchContacts().then(setContacts).catch(console.error);
+    fetchDashboardMetrics().then(setDashboardMetrics).catch(console.error);
+  }, []);
+
+  // Track selected contact for Cold→Nurture button visibility
+  const handleContactSelectionChange = useCallback((selectedIds) => {
+    if (selectedIds.length === 1) {
+      const contact = contacts.find(c => c.id === selectedIds[0]);
+      setSelectedContactForOC(contact || null);
+    } else {
+      setSelectedContactForOC(null);
+    }
+  }, [contacts]);
+
+  // Check if Cold→Nurture button should be visible
+  const showColdToNurtureBtn = useMemo(() => {
+    return tab === 'contacts' && selectedContactForOC?.outreach_category === 'cold';
+  }, [tab, selectedContactForOC]);
+
   // --- Content handlers ---
   const handleCreateContent = (data) => {
     createContent(data)
@@ -456,7 +499,11 @@ function App() {
   // --- Activity handlers ---
   const handleCreateActivity = (data) => {
     createActivity(data)
-      .then(created => setActivities(prev => [...prev, created]))
+      .then(created => {
+        setActivities(prev => [...prev, created]);
+        // Refresh dashboard metrics after creating activity
+        fetchDashboardMetrics().then(setDashboardMetrics).catch(console.error);
+      })
       .catch(console.error);
   };
 
@@ -542,6 +589,8 @@ function App() {
       .then(() => {
         const idSet = new Set(ids);
         setActivities(prev => prev.filter(a => !idSet.has(a.id)));
+        // Refresh dashboard metrics after deleting activities
+        fetchDashboardMetrics().then(setDashboardMetrics).catch(console.error);
       })
       .catch(console.error);
   };
@@ -551,7 +600,19 @@ function App() {
       <div className="App">
         <div className="app-bar">
           <span className="app-bar-title" style={{ background: instanceColor }}>{instanceName}</span>
+          <div className="cold-banner" style={{
+            padding: '4px 12px',
+            backgroundColor: '#e3f2fd',
+            color: '#1565c0',
+            fontWeight: '600',
+            fontSize: '13px',
+            borderRadius: '4px',
+            marginLeft: '8px',
+          }}>
+            Cold Today: {dashboardMetrics?.cold_outreach_today ?? 0}
+          </div>
           <div className="app-bar-tabs">
+            <button className={tab === 'dashboard' ? 'tab active' : 'tab'} onClick={() => setTab('dashboard')}>Dashboard</button>
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
             <button className={tab === 'staging' ? 'tab active' : 'tab'} onClick={() => setTab('staging')}>
               Staging{stagedContacts.length > 0 && <span className="tab-badge">{stagedContacts.length}</span>}
@@ -561,25 +622,44 @@ function App() {
             <button className={tab === 'filter' ? 'tab active' : 'tab'} onClick={() => setTab('filter')}>Filter</button>
             <button className={tab === 'reports' ? 'tab active' : 'tab'} onClick={() => setTab('reports')}>Reports</button>
           </div>
-          <AppMenu
-            tab={tab}
-            onNavigate={setTab}
-            onGlobalLookup={handleMenuGlobalLookup}
-            onFocusSearch={handleMenuFocusSearch}
-            onLinkedInSearch={handleMenuLinkedInSearch}
-            onOpenUrl={handleMenuOpenUrl}
-            onClearFilters={handleClearAllFilters}
-            onLinkedInImport={() => setShowLinkedInImport(true)}
-            onConferenceImport={() => setShowConferenceImport(true)}
-            onLinkedInUpdate={handleMenuLinkedInUpdate}
-            onProfileSearch={handleProfileSearch}
-            onSoftRefresh={handleSoftRefresh}
-            onPaste={handleMenuPaste}
-            onCopy={handleMenuCopy}
-            onPageForward={handleMenuPageForward}
-            onPageBackward={handleMenuPageBackward}
-          />
           <div className="app-bar-right">
+            <AppMenu
+              tab={tab}
+              onNavigate={setTab}
+              onGlobalLookup={handleMenuGlobalLookup}
+              onFocusSearch={handleMenuFocusSearch}
+              onLinkedInSearch={handleMenuLinkedInSearch}
+              onOpenUrl={handleMenuOpenUrl}
+              onClearFilters={handleClearAllFilters}
+              onLinkedInImport={() => setShowLinkedInImport(true)}
+              onConferenceImport={() => setShowConferenceImport(true)}
+              onLinkedInUpdate={handleMenuLinkedInUpdate}
+              onProfileSearch={handleProfileSearch}
+              onSoftRefresh={handleSoftRefresh}
+              onPaste={handleMenuPaste}
+              onCopy={handleMenuCopy}
+              onPageForward={handleMenuPageForward}
+              onPageBackward={handleMenuPageBackward}
+            />
+            {showColdToNurtureBtn && (
+              <button
+                className="cold-to-nurture-btn"
+                onClick={handleColdToNurtureClick}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '13px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginRight: '8px',
+                }}
+                title="Convert selected contact from Cold to Nurture"
+              >
+                Cold → Nurture
+              </button>
+            )}
             {tab === 'contacts' && (
               <button
                 className="cto-filter-btn"
@@ -606,6 +686,12 @@ function App() {
           </div>
         </div>
         <main>
+          <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}>
+            <DashboardPage
+              ref={dashboardRef}
+              onMetricsUpdate={setDashboardMetrics}
+            />
+          </div>
           <div style={{ display: tab === 'activities' ? 'block' : 'none' }}>
             <ActivityTable
               ref={activityTableRef}
@@ -659,6 +745,7 @@ function App() {
               onDeleteBatch={handleDeleteContactsBatch}
               onNewActivity={handleNewActivityForContact}
               onLinkedInUpdate={(contact) => setLinkedInUpdateContact(contact)}
+              onSelectionChange={handleContactSelectionChange}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -811,6 +898,13 @@ function App() {
           onDismissUndo={() => {}}
           entityLabel="staged contacts"
         />
+        {coldToNurtureContact && (
+          <ColdToNurtureModal
+            contact={coldToNurtureContact}
+            onClose={() => setColdToNurtureContact(null)}
+            onSuccess={handleColdToNurtureSuccess}
+          />
+        )}
       </div>
     </AgGridProvider>
   );

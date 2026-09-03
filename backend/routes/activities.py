@@ -24,7 +24,7 @@ def create_activity():
     contact_id = data.get('contact_id')
     if not contact_id:
         return jsonify({'error': 'contact_id is required'}), 400
-    Contact.query.get_or_404(contact_id)
+    contact = Contact.query.get_or_404(contact_id)
     # Validate content exists if provided
     content_id = data.get('content_id') or None
     if content_id:
@@ -46,6 +46,7 @@ def create_activity():
         topic=data.get('topic'),
         comment=data.get('comment'),
         in_crm=data.get('in_crm', False),
+        outreach_category=contact.outreach_category,  # Snapshot from contact
     )
     db.session.add(activity)
     db.session.commit()

@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { themeBalham } from 'ag-grid-community';
-import { STAGED_CONTACT_FIELDS, SOURCE_TYPES, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
-import { guessStagedContactEmails } from './apiService';
+import { STAGED_CONTACT_FIELDS, SOURCE_TYPES, OUTREACH_CATEGORIES, isPinnedRow, createEmptyRow, copyRowsToClipboard } from './gridUtils';
+import { guessStagedContactEmails, setStagedContactsBulkOC } from './apiService';
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
@@ -225,6 +225,34 @@ const StagingTable = forwardRef(function StagingTable({
     );
   }, [selectedStagedContacts]);
 
+  // State for OC dropdown
+  const [ocDropdownOpen, setOcDropdownOpen] = useState(false);
+
+  const handleSetBulkOC = useCallback(async (oc) => {
+    if (selectedRows.length === 0) return;
+    try {
+      await setStagedContactsBulkOC(selectedRows, oc);
+      onRefreshStagedContacts?.();
+    } catch (err) {
+      console.error('Failed to set OC:', err);
+      alert('Failed to set Outreach Category: ' + err.message);
+    }
+    setOcDropdownOpen(false);
+  }, [selectedRows, onRefreshStagedContacts]);
+
+  // Check if any selected rows are missing OC (for promotion validation display)
+  const anySelectedMissingOC = useMemo(() => {
+    return selectedStagedContacts.some(c => !c.outreach_category);
+  }, [selectedStagedContacts]);
+
+  // Close OC dropdown when clicking outside
+  useEffect(() => {
+    if (!ocDropdownOpen) return;
+    const handleClickOutside = () => setOcDropdownOpen(false);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [ocDropdownOpen]);
+
   // Build a map of contact IDs to contact data for fast lookup (use ref to avoid columnDefs recreation)
   const contactsByIdRef = useRef({});
   contactsByIdRef.current = useMemo(() => {
@@ -322,6 +350,14 @@ const StagingTable = forwardRef(function StagingTable({
       headerName: 'Details',
       children: [
         { field: 'source', width: 100, editable: true },
+        {
+          field: 'outreach_category',
+          headerName: 'OC',
+          width: 90,
+          editable: true,
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: ['', ...OUTREACH_CATEGORIES] },
+        },
         { field: 'tags', width: 120, editable: true },
         { field: 'education', width: 120, editable: true, columnGroupShow: 'open' },
         { field: 'comment', width: 160, editable: true, columnGroupShow: 'open' },
@@ -735,8 +771,50 @@ const StagingTable = forwardRef(function StagingTable({
           )}
           {selectedRows.length > 0 && (
             <>
-              <button onClick={handlePromoteSelected} className="edit-btn">
-                Promote Selected ({selectedRows.length})
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  onClick={() => setOcDropdownOpen(!ocDropdownOpen)}
+                  className="edit-btn"
+                  style={{ minWidth: '80px' }}
+                >
+                  Set OC ▼
+                </button>
+                {ocDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    backgroundColor: 'white',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '100px',
+                  }}>
+                    {OUTREACH_CATEGORIES.map(oc => (
+                      <div
+                        key={oc}
+                        onClick={() => handleSetBulkOC(oc)}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #eee',
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f0f0'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                      >
+                        {oc}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handlePromoteSelected}
+                className="edit-btn"
+                title={anySelectedMissingOC ? 'Some selected contacts are missing Outreach Category' : ''}
+              >
+                Promote Selected ({selectedRows.length}){anySelectedMissingOC ? ' ⚠' : ''}
               </button>
               <button onClick={handleSkipSelected} className="delete-btn">
                 Skip Selected ({selectedRows.length})

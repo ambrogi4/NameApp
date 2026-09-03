@@ -109,3 +109,13 @@ export const promoteStagedContact = (id, options = {}) => apiPost(`/staging/${id
 export const promoteStagedContactsBatch = (actions) => apiPost('/staging/promote-batch', actions);
 export const recheckStagingDupes = () => apiPost('/staging/recheck-dupes', {});
 export const guessStagedContactEmails = (ids) => apiPost('/staging/guess-emails', { ids });
+export const setStagedContactsBulkOC = (ids, outreach_category) =>
+  apiPut('/staging/bulk-oc', { ids, outreach_category });
+
+// OC Transitions
+export const fetchOcTransitions = (contactId) =>
+  apiGet(contactId ? `/oc-transitions?contact_id=${contactId}` : '/oc-transitions');
+export const createOcTransition = (data) => apiPost('/oc-transitions', data);
+
+// Dashboard
+export const fetchDashboardMetrics = () => apiGet('/dashboard/metrics');
