@@ -21,6 +21,94 @@
 ## In Progress
 <!-- Update this at the start/end of each session -->
 
+## Completed (2026-09-03) — Chrome Extension Simplification
+
+### Bug Fixed
+When using the Alt+P workflow from StagingTable:
+1. User presses Alt+P on a staged contact → opens LinkedIn search
+2. User finds profile, clicks "Capture Profile" in extension
+3. **Bug**: Extension created a NEW staged record instead of updating the existing one
+4. Result: Duplicate records in staging for the same contact
+
+### Root Cause
+The "Capture Profile" button always called `POST /api/staging` to create a new record.
+It didn't check for a pending staged contact from the Alt+P workflow stored in `localStorage`.
+
+### Fix + UI Simplification
+Modified `captureProfile()` in `extension/popup.js` to be context-aware:
+1. Check if there's a pending staged contact in myCRM localStorage (from Alt+P)
+2. If found: UPDATE that record via `PUT /api/staging/:id`
+3. If not found: CREATE new record
+
+**Removed "Update myCRM" buttons** — they were now redundant since "Capture Profile" handles both cases:
+- Started from staging (Alt+P) → updates existing record
+- Started from LinkedIn directly → creates new record
+
+**UI Before**: 4 buttons (Capture Profile, Capture Profile + CR, Update myCRM w CP, Update myCRM w CP+CR)
+**UI After**: 2 buttons (Capture Profile, Capture Profile + CR)
+
+Files changed:
+- `extension/popup.html` — removed Update buttons and divider
+- `extension/popup.js` — removed `updateProfile()` function, made `captureProfile()` context-aware
+
+**To deploy:**
+1. Reload Chrome extension (chrome://extensions → Reload)
+
+## Completed (2026-09-02) — Outreach Category (OC) Feature
+
+### Database Schema
+- **New column `outreach_category`** added to `contact`, `contact_staging`, and `activity` tables
+- **New table `oc_transition`** for tracking Cold→Nurture conversions with comment, date, and last_activity_id
+- **Migration**: `c7d8e9f0a1b2_add_outreach_category.py`
+
+### Backend Changes (`backend/`)
+- **models.py**: Added `outreach_category` to Contact, ContactStaging, Activity; added OcTransition model
+- **routes/activities.py**: Auto-populates `outreach_category` from Contact on activity creation (snapshot)
+- **routes/staging.py**:
+  - Added `outreach_category` to CONTACT_FIELDS
+  - Added `PUT /staging/bulk-oc` endpoint for bulk OC assignment
+  - Added promotion validation (blocks if OC is NULL)
+  - CR activity creation now includes OC from contact
+- **routes/oc_transitions.py** (NEW): POST/GET for OC transitions, auto-captures last_activity_id
+- **routes/dashboard.py** (NEW): GET /dashboard/metrics returns cold_outreach_today, this_week, this_month, breakdown
+
+### Frontend Changes (`frontend/src/`)
+- **gridUtils.js**: Added `OUTREACH_CATEGORIES` constant: ['cold', 'nurture', 'partner', 'existing', 'internal', 'admin']
+- **apiService.js**: Added `setStagedContactsBulkOC`, `fetchOcTransitions`, `createOcTransition`, `fetchDashboardMetrics`
+- **ContactTable.js**:
+  - Added OC dropdown column in Details group (after source)
+  - Changed Alt+D to Alt+Q for LinkedIn update (D now for Dashboard)
+  - Added `onSelectionChange` prop for tracking selected contact
+- **ActivityTable.js**: Added read-only OC column (snapshot from contact)
+- **StagingTable.js**:
+  - Added OC dropdown column
+  - Added "Set OC" dropdown button for bulk assignment
+  - Warning indicator on Promote if OC is missing
+- **DashboardPage.js** (NEW): Large "Cold Outreach Today" tile with weekly/monthly stats
+- **ColdToNurtureModal.js** (NEW): Ceremony modal for Cold→Nurture conversion with date picker and comment
+
+### App.js Integration
+- **Dashboard tab**: First in tab order, default on app load, Alt+D shortcut
+- **Persistent banner**: Shows "Cold Today: X" on all tabs
+- **Cold→Nurture button**: Visible when Contacts tab, 1 row selected, OC='cold'
+- **Menu repositioned**: Navigate/Utilities moved to right side of app bar
+- **Metrics refresh**: Dashboard metrics refresh on activity create/delete and OC transition
+
+### Keyboard Shortcuts
+- `Alt+D` → Dashboard tab (NEW)
+- `Alt+Q` → LinkedIn Update (was Alt+D)
+
+### Workflow
+1. Contacts have `outreach_category`: cold, nurture, partner, existing, internal, admin
+2. Activities snapshot contact's OC at creation time
+3. Dashboard shows cold outreach count (today/week/month)
+4. Cold→Nurture button opens ceremony modal to capture comment and date
+5. Transitions stored in `oc_transition` table for analytics
+
+**To deploy:**
+1. Run migration: `flask db upgrade` on all instances
+2. Rebuild backend: `docker-compose build backend_work && docker-compose stop backend_work && docker-compose rm -f backend_work && docker-compose up -d backend_work`
+
 ## Completed (2026-08-10) — LinkedIn CR Automation
 
 ### LinkedIn Connection Request (CR) Automation
