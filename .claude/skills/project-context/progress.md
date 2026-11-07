@@ -21,6 +21,113 @@
 ## In Progress
 <!-- Update this at the start/end of each session -->
 
+## Completed (2026-11-02) — Salesforce Export Feature
+
+### Overview
+Added Salesforce contact export with validation to prepare for corporate Salesforce integration. Exports contacts as CSV with required field validation.
+
+### Required Fields (Validation)
+1. first (required)
+2. last (required)
+3. title (required)
+4. firm (required)
+5. email OR li_url (at least one required)
+6. country (required)
+
+If any selected/filtered contacts fail validation, error modal shows all problematic records with missing fields. File is NOT created if validation fails.
+
+### CSV Format
+Columns: `first, last, title, firm, email, LinkedIn, Country`
+- Both email and LinkedIn columns populated if both exist
+- File naming:
+  - From button: `salesforce_contacts_YYYY-MM-DD_HHMMSS.csv`
+  - From menu: `salesforce_today_YYYY-MM-DD.csv` or `salesforce_week_YYYY-MM-DD.csv`
+
+### New Files
+- **`frontend/src/salesforceUtils.js`**: Reusable validation, CSV generation, download functions
+- **`frontend/src/SalesforceValidationModal.js`**: Modal to display validation errors
+
+### UI - Contacts Table Button
+- **"SF file" button** (grey) on Contacts toolbar
+- Positioned far right using `marginLeft: auto`
+- Only visible when contacts selected
+- Validates selected contacts → shows errors OR downloads CSV
+
+### UI - Utilities Menu
+Added to AppMenu after "Copy Data":
+- **Divider**
+- **Section header**: "Salesforce File"
+- **"Today's Contacts"**: Exports contacts where `created_date = today` (browser timezone)
+- **"This Week's Contacts"**: Exports contacts where `created_date >= today - 7 days` (browser timezone)
+
+### Files Changed
+- `frontend/src/App.js`: Added handlers, state, modal rendering
+- `frontend/src/ContactTable.js`: Added SF file button and prop
+- `frontend/src/AppMenu.js`: Added Salesforce menu section
+
+### Date Filtering
+Uses browser's local date (not server UTC) for "Today" and "This Week" filters via `getTodayDateString()` and `getWeekAgoDateString()` utilities.
+
+## Completed (2026-11-02) — Country Field Support in LinkedIn Import
+
+### Changes Made
+Added country extraction from LinkedIn profiles to support future Salesforce integration.
+
+### Backend Changes (`backend/routes/contacts.py`)
+- **Updated Claude prompt in `/api/contacts/parse-linkedin`** (line 123-138):
+  - Added `country` field to extraction prompt
+  - Country mapping rules:
+    - US/USA → "United States"
+    - UK/England → "United Kingdom"
+    - Other countries → standard short name (e.g., "Canada")
+  - Empty string if unknown
+- **Added `country` to field validation** (line 156):
+  - Ensures `country` is always present in API response
+
+### Extension Changes (`extension/popup.js`)
+- **Added country to update payload** (line 107):
+  - When updating existing staged contact from LinkedIn, now includes country data
+  - Keeps country in sync with other location fields (city, state)
+
+### Database & Frontend
+No changes needed:
+- Database already had `country` column in `contact` and `contact_staging` tables
+- Frontend tables (ContactTable, StagingTable) already display country field in Location column group
+- Staging routes already handle country field in CONTACT_FIELDS
+
+### Workflow
+1. User clicks "Capture Profile" or "Capture Profile + CR" in Chrome extension
+2. LinkedIn profile text extracted and sent to `/api/contacts/parse-linkedin`
+3. Claude now extracts: first, last, title, firm, city, state, **country**, education
+4. Country populated in staging table with standardized names
+5. On promotion, country flows to contact table
+6. Ready for future Salesforce sync which requires country field
+
+### Extension Bug Fix: Comment Field Not Working for "Capture Profile" Button
+**Issue**: Comment field only worked for "Capture Profile + CR" (green button), not for regular "Capture Profile" (blue button).
+
+**Root Cause** (`extension/popup.js` line 29):
+```javascript
+const comment = withCR ? (crCommentEl.value || '').trim() : '';
+```
+Comment was only captured when `withCR=true`.
+
+**Fix**:
+- Changed to always capture comment: `const comment = (crCommentEl.value || '').trim();`
+- Updated clearing logic to clear comment field after any successful capture (not just CR captures)
+- Now both buttons respect the comment field
+
+### Deployment
+Backend rebuild required for prompt changes:
+```bash
+docker-compose build backend_work && docker-compose stop backend_work && docker-compose rm -f backend_work && docker-compose up -d backend_work
+```
+
+Extension reload required:
+1. Navigate to `chrome://extensions`
+2. Find "NameApp" extension
+3. Click "Reload"
+
 ## Completed (2026-09-03) — Chrome Extension Simplification
 
 ### Bug Fixed
@@ -53,6 +160,31 @@ Files changed:
 
 **To deploy:**
 1. Reload Chrome extension (chrome://extensions → Reload)
+
+## Completed (2026-09-03) — Timezone Bug Fix for Activity Dates
+
+### Bug
+Activities created at 9:10 PM Eastern on Sept 2nd were saved with date Sept 3rd.
+
+### Root Cause
+Frontend used `new Date().toISOString().slice(0, 10)` to default activity_date.
+`toISOString()` converts to UTC, so 9:10 PM Eastern = 1:10 AM UTC next day.
+
+### Fix
+Changed to use local date components instead of UTC:
+```javascript
+const now = new Date();
+`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+```
+
+Files changed:
+- `frontend/src/gridUtils.js` — createEmptyRow activity_date default
+- `frontend/src/ColdToNurtureModal.js` — transition date default
+
+**Note**: Backend dashboard metrics still use server's `date.today()` (UTC) which could show wrong "today" counts after 8 PM Eastern. Consider passing client date to API if this becomes an issue.
+
+**To deploy:**
+1. Rebuild backend: standard docker-compose workflow
 
 ## Completed (2026-09-02) — Outreach Category (OC) Feature
 
