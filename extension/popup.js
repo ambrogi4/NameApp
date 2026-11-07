@@ -25,8 +25,8 @@ async function captureProfile(withCR) {
   setAllButtonsDisabled(true);
   resultEl.textContent = '';
 
-  // Get comment for CR captures
-  const comment = withCR ? (crCommentEl.value || '').trim() : '';
+  // Get comment from field (applies to both capture types)
+  const comment = (crCommentEl.value || '').trim();
 
   try {
     // Get active tab
@@ -105,6 +105,7 @@ async function captureProfile(withCR) {
       if (profileData.firm) updatePayload.firm = profileData.firm;
       if (profileData.city) updatePayload.city = profileData.city;
       if (profileData.state) updatePayload.state = profileData.state;
+      if (profileData.country) updatePayload.country = profileData.country;
       if (profileData.education) updatePayload.education = profileData.education;
 
       // Always update LinkedIn URL
@@ -182,8 +183,8 @@ async function captureProfile(withCR) {
           ${withCR ? '<br><strong>+ Connection Request</strong>' : ''}
           ${comment ? '<br><em>Note: ' + comment + '</em>' : ''}
         `;
-        // Clear comment field after successful CR capture
-        if (withCR) {
+        // Clear comment field after successful capture
+        if (comment) {
           crCommentEl.value = '';
         }
       } else {

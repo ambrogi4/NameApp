@@ -131,6 +131,9 @@ def parse_linkedin_profile():
         '(empty string if unemployed, self-employed, or unclear)\n'
         '- "city": city from location info (empty string if unknown)\n'
         '- "state": US state abbreviation from location info (empty string if unknown or non-US)\n'
+        '- "country": country from location info. Use "United States" for US contacts, '
+        '"United Kingdom" for UK/England contacts, and the standard short country name for others '
+        '(e.g., "Canada", "Germany", "France"). Empty string if unknown.\n'
         '- "education": university name only (undergraduate institution preferred), '
         'no degree or major details; if multiple schools, pick the undergrad; '
         'empty string if not listed\n'
@@ -153,7 +156,7 @@ def parse_linkedin_profile():
         return jsonify({'error': f'Claude API error: {e}'}), 502
 
     # Ensure all expected fields exist
-    for field in ['first', 'last', 'title', 'firm', 'city', 'state', 'education']:
+    for field in ['first', 'last', 'title', 'firm', 'city', 'state', 'country', 'education']:
         if field not in result:
             result[field] = ''
 
