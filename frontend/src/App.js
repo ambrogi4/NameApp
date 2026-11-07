@@ -19,7 +19,6 @@ import StagingTable from './StagingTable';
 import StagingPromoteModal from './StagingPromoteModal';
 import DupeReviewModal from './DupeReviewModal';
 import MergeReviewModal from './MergeReviewModal';
-import LinkedInImportModal from './LinkedInImportModal';
 import LinkedInUpdateModal from './LinkedInUpdateModal';
 import ConferenceImportModal from './ConferenceImportModal';
 import PasteConfirmBar from './PasteConfirmBar';
@@ -28,8 +27,15 @@ import ReportsPage from './ReportsPage';
 import DashboardPage from './DashboardPage';
 import ColdToNurtureModal from './ColdToNurtureModal';
 import AppMenu from './AppMenu';
+import SalesforceValidationModal from './SalesforceValidationModal';
 import { findDuplicate, findDuplicates } from './dupeUtils';
 import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
+import {
+  validateContactsForSalesforce,
+  downloadSalesforceCsv,
+  getTodayDateString,
+  getWeekAgoDateString
+} from './salesforceUtils';
 import './App.css';
 
 const TAB_KEY = 'nameApp_currentTab';
@@ -58,7 +64,6 @@ function App() {
   const [quickFilterText, setQuickFilterText] = useState('');
   const [showLookup, setShowLookup] = useState(false);
   const [lookupSearch, setLookupSearch] = useState('');
-  const [showLinkedInImport, setShowLinkedInImport] = useState(false);
   const [showConferenceImport, setShowConferenceImport] = useState(false);
   const [linkedInUpdateContact, setLinkedInUpdateContact] = useState(null);
   const [pendingPaste, setPendingPaste] = useState(null);
@@ -69,6 +74,7 @@ function App() {
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [coldToNurtureContact, setColdToNurtureContact] = useState(null);
   const [selectedContactForOC, setSelectedContactForOC] = useState(null);
+  const [salesforceValidationErrors, setSalesforceValidationErrors] = useState(null);
 
   const contactTableRef = useRef(null);
   const dashboardRef = useRef(null);
@@ -95,8 +101,6 @@ function App() {
         setLookupSearch('');
         return;
       }
-      // Alt+I: LinkedIn import
-      if (e.key === 'i') { e.preventDefault(); setShowLinkedInImport(true); return; }
       // Alt+K: Conference import
       if (e.key === 'k') { e.preventDefault(); setShowConferenceImport(true); return; }
       // Alt+S: Focus global search
@@ -576,6 +580,88 @@ function App() {
     else if (tab === 'content') contentTableRef.current?.pageBackward?.();
   }, [tab]);
 
+  // --- Salesforce export handlers ---
+  const getEasternTimestamp = () => {
+    const now = new Date();
+    const eastern = now.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    // Format: "MM/DD/YYYY, HH:MM:SS" -> "YYYY-MM-DD_HHMMSS"
+    const parts = eastern.match(/(\d+)\/(\d+)\/(\d+), (\d+):(\d+):(\d+)/);
+    if (parts) {
+      const [, month, day, year, hour, minute, second] = parts;
+      return `${year}-${month}-${day}_${hour}${minute}${second}`;
+    }
+    // Fallback to ISO if parsing fails
+    return now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  };
+
+  const handleSalesforceExport = useCallback((contactsToExport) => {
+    const errors = validateContactsForSalesforce(contactsToExport);
+    if (errors.length > 0) {
+      setSalesforceValidationErrors(errors);
+      return;
+    }
+
+    const timestamp = getEasternTimestamp();
+    const filename = `salesforce_contacts_${timestamp}`;
+    downloadSalesforceCsv(contactsToExport, filename);
+  }, []);
+
+  const handleSalesforceExportToday = useCallback(() => {
+    const today = getTodayDateString();
+    const todayContacts = contacts.filter(c => {
+      if (!c.created_date) return false;
+      const createdDate = c.created_date.slice(0, 10); // Extract YYYY-MM-DD
+      return createdDate === today;
+    });
+
+    if (todayContacts.length === 0) {
+      alert('No contacts created today.');
+      return;
+    }
+
+    const errors = validateContactsForSalesforce(todayContacts);
+    if (errors.length > 0) {
+      setSalesforceValidationErrors(errors);
+      return;
+    }
+
+    const filename = `salesforce_today_${today}`;
+    downloadSalesforceCsv(todayContacts, filename);
+  }, [contacts]);
+
+  const handleSalesforceExportWeek = useCallback(() => {
+    const today = getTodayDateString();
+    const weekAgo = getWeekAgoDateString();
+    const weekContacts = contacts.filter(c => {
+      if (!c.created_date) return false;
+      const createdDate = c.created_date.slice(0, 10); // Extract YYYY-MM-DD
+      return createdDate >= weekAgo && createdDate <= today;
+    });
+
+    if (weekContacts.length === 0) {
+      alert('No contacts created this week.');
+      return;
+    }
+
+    const errors = validateContactsForSalesforce(weekContacts);
+    if (errors.length > 0) {
+      setSalesforceValidationErrors(errors);
+      return;
+    }
+
+    const filename = `salesforce_week_${today}`;
+    downloadSalesforceCsv(weekContacts, filename);
+  }, [contacts]);
+
   const handleDeleteActivity = (id) => {
     if (!window.confirm('Delete this activity?')) return;
     deleteActivity(id)
@@ -600,19 +686,20 @@ function App() {
       <div className="App">
         <div className="app-bar">
           <span className="app-bar-title" style={{ background: instanceColor }}>{instanceName}</span>
-          <div className="cold-banner" style={{
-            padding: '4px 12px',
-            backgroundColor: '#e3f2fd',
-            color: '#1565c0',
-            fontWeight: '600',
-            fontSize: '13px',
-            borderRadius: '4px',
-            marginLeft: '8px',
-          }}>
-            Cold Today: {dashboardMetrics?.cold_outreach_today ?? 0}
-          </div>
           <div className="app-bar-tabs">
             <button className={tab === 'dashboard' ? 'tab active' : 'tab'} onClick={() => setTab('dashboard')}>Dashboard</button>
+            <div className="cold-banner" style={{
+              padding: '4px 12px',
+              backgroundColor: '#e3f2fd',
+              color: '#1565c0',
+              fontWeight: '600',
+              fontSize: '13px',
+              borderRadius: '4px',
+              marginLeft: '4px',
+              marginRight: '8px',
+            }}>
+              Cold Today: {dashboardMetrics?.cold_outreach_today ?? 0}
+            </div>
             <button className={tab === 'activities' ? 'tab active' : 'tab'} onClick={() => setTab('activities')}>Activities</button>
             <button className={tab === 'staging' ? 'tab active' : 'tab'} onClick={() => setTab('staging')}>
               Staging{stagedContacts.length > 0 && <span className="tab-badge">{stagedContacts.length}</span>}
@@ -631,7 +718,6 @@ function App() {
               onLinkedInSearch={handleMenuLinkedInSearch}
               onOpenUrl={handleMenuOpenUrl}
               onClearFilters={handleClearAllFilters}
-              onLinkedInImport={() => setShowLinkedInImport(true)}
               onConferenceImport={() => setShowConferenceImport(true)}
               onLinkedInUpdate={handleMenuLinkedInUpdate}
               onProfileSearch={handleProfileSearch}
@@ -640,6 +726,8 @@ function App() {
               onCopy={handleMenuCopy}
               onPageForward={handleMenuPageForward}
               onPageBackward={handleMenuPageBackward}
+              onSalesforceExportToday={handleSalesforceExportToday}
+              onSalesforceExportWeek={handleSalesforceExportWeek}
             />
             {showColdToNurtureBtn && (
               <button
@@ -708,6 +796,15 @@ function App() {
             />
           </div>
           <div style={{ display: tab === 'staging' ? 'block' : 'none' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <ContactForm onSave={handleCreateStagedContact} />
+              <button
+                onClick={() => setShowConferenceImport(true)}
+                style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Conference Import
+              </button>
+            </div>
             <StagingTable
               ref={stagingTableRef}
               stagedContacts={stagedContacts}
@@ -722,20 +819,10 @@ function App() {
               onRefreshStagedContacts={() => fetchStagedContacts().then(setStagedContacts).catch(console.error)}
               onPasteRows={handlePasteStagedContacts}
               onNewActivity={handleNewActivityForContact}
-              onConferenceImport={() => setShowConferenceImport(true)}
               quickFilterText={quickFilterText}
             />
           </div>
           <div style={{ display: tab === 'contacts' ? 'block' : 'none' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <ContactForm onSave={handleCreateContact} />
-              <button
-                onClick={() => setShowLinkedInImport(true)}
-                style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                LinkedIn Import
-              </button>
-            </div>
             <ContactTable
               ref={contactTableRef}
               contacts={contacts}
@@ -746,6 +833,7 @@ function App() {
               onNewActivity={handleNewActivityForContact}
               onLinkedInUpdate={(contact) => setLinkedInUpdateContact(contact)}
               onSelectionChange={handleContactSelectionChange}
+              onSalesforceExport={handleSalesforceExport}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -812,12 +900,6 @@ function App() {
               />
             </div>
           </div>
-        )}
-        {showLinkedInImport && (
-          <LinkedInImportModal
-            onSave={handleCreateStagedContact}
-            onClose={() => setShowLinkedInImport(false)}
-          />
         )}
         {showConferenceImport && (
           <ConferenceImportModal
@@ -903,6 +985,12 @@ function App() {
             contact={coldToNurtureContact}
             onClose={() => setColdToNurtureContact(null)}
             onSuccess={handleColdToNurtureSuccess}
+          />
+        )}
+        {salesforceValidationErrors && (
+          <SalesforceValidationModal
+            errors={salesforceValidationErrors}
+            onClose={() => setSalesforceValidationErrors(null)}
           />
         )}
       </div>

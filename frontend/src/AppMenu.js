@@ -8,7 +8,6 @@ const AppMenu = ({
   onLinkedInSearch,
   onOpenUrl,
   onClearFilters,
-  onLinkedInImport,
   onConferenceImport,
   onLinkedInUpdate,
   onProfileSearch,
@@ -17,6 +16,8 @@ const AppMenu = ({
   onCopy,
   onPageForward,
   onPageBackward,
+  onSalesforceExportToday,
+  onSalesforceExportWeek,
 }) => {
   const [openMenu, setOpenMenu] = useState(null);
   const menuRef = useRef(null);
@@ -79,6 +80,11 @@ const AppMenu = ({
               onClick={() => executeAction(() => onNavigate('activities'))}
             />
             <MenuItem
+              label="Staging"
+              shortcut="Alt+T"
+              onClick={() => executeAction(() => onNavigate('staging'))}
+            />
+            <MenuItem
               label="Contacts"
               shortcut="Alt+C"
               onClick={() => executeAction(() => onNavigate('contacts'))}
@@ -98,12 +104,17 @@ const AppMenu = ({
               shortcut="Alt+R"
               onClick={() => executeAction(() => onNavigate('reports'))}
             />
+            <MenuItem
+              label="Dashboard"
+              shortcut="Alt+D"
+              onClick={() => executeAction(() => onNavigate('dashboard'))}
+            />
             <div className="app-menu-divider" />
             <MenuItem
               label="Navigate tab left"
               shortcut="Alt+↑"
               onClick={() => executeAction(() => {
-                const tabs = ['activities', 'contacts', 'content', 'filter', 'reports'];
+                const tabs = ['dashboard', 'activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
                 const idx = tabs.indexOf(tab);
                 if (idx > 0) onNavigate(tabs[idx - 1]);
               })}
@@ -112,7 +123,7 @@ const AppMenu = ({
               label="Navigate tab right"
               shortcut="Alt+↓"
               onClick={() => executeAction(() => {
-                const tabs = ['activities', 'contacts', 'content', 'filter', 'reports'];
+                const tabs = ['dashboard', 'activities', 'staging', 'contacts', 'content', 'filter', 'reports'];
                 const idx = tabs.indexOf(tab);
                 if (idx < tabs.length - 1) onNavigate(tabs[idx + 1]);
               })}
@@ -180,20 +191,14 @@ const AppMenu = ({
             <div className="app-menu-divider" />
             <div className="app-menu-section-header">Insert / Edit Data</div>
             <MenuItem
-              label="LinkedIn Import"
-              shortcut="Alt+I"
-              onClick={() => executeAction(onLinkedInImport)}
-              indent
-            />
-            <MenuItem
               label="Conference Import"
               shortcut="Alt+K"
               onClick={() => executeAction(onConferenceImport)}
               indent
             />
             <MenuItem
-              label="Update record"
-              shortcut="Alt+D"
+              label="LinkedIn Update"
+              shortcut="Alt+Q"
               disabled={!isContactsTab}
               onClick={() => executeAction(onLinkedInUpdate, !isContactsTab)}
               indent
@@ -224,6 +229,18 @@ const AppMenu = ({
               shortcut="Ctrl+C"
               disabled={!isGridTab}
               onClick={() => executeAction(onCopy, !isGridTab)}
+              indent
+            />
+            <div className="app-menu-divider" />
+            <div className="app-menu-section-header">Salesforce File</div>
+            <MenuItem
+              label="Today's Contacts"
+              onClick={() => executeAction(onSalesforceExportToday)}
+              indent
+            />
+            <MenuItem
+              label="This Week's Contacts"
+              onClick={() => executeAction(onSalesforceExportWeek)}
               indent
             />
           </div>

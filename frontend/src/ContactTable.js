@@ -5,7 +5,7 @@ import { CONTACT_FIELDS, OUTREACH_CATEGORIES, isPinnedRow, createEmptyRow, copyR
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
-const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, onSelectionChange, quickFilterText, lookupMode, onDismiss }, ref) {
+const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, onSelectionChange, onSalesforceExport, quickFilterText, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -396,6 +396,26 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
         gridRef.current?.api?.deselectAll();
       }
 
+      // OC hotkeys: c=cold, n=nurture, p=partner, e=existing, i=internal, a=admin
+      const ocKeyMap = { c: 'cold', n: 'nurture', p: 'partner', e: 'existing', i: 'internal', a: 'admin' };
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && ocKeyMap[e.key.toLowerCase()]) {
+        const api = gridRef.current?.api;
+        const cell = api?.getFocusedCell();
+        if (cell && !cell.rowPinned) {
+          const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+          if (colId === 'outreach_category') {
+            e.preventDefault();
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode?.data?.id) {
+              const newOC = ocKeyMap[e.key.toLowerCase()];
+              const { id, ...rest } = rowNode.data;
+              onUpdateContact(id, { ...rest, outreach_category: newOC });
+            }
+            return;
+          }
+        }
+      }
+
       // Alt+U: open URL in focused cell
       if (e.altKey && e.key === 'u') {
         e.preventDefault();
@@ -537,6 +557,23 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
               }}
             >
               Delete Selected ({selectedRows.length})
+            </button>
+          )}
+          {selectedRows.length > 0 && (
+            <button
+              onClick={() => onSalesforceExport(selectedContacts)}
+              style={{
+                marginLeft: 'auto',
+                backgroundColor: '#9e9e9e',
+                color: 'white',
+                padding: '6px 12px',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              SF file
             </button>
           )}
         </div>
