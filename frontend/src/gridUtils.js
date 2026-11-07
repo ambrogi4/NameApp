@@ -157,9 +157,10 @@ export function isPinnedRow(params) {
 export function createEmptyRow(fields, overrides = {}) {
   const row = {};
   fields.forEach(f => { row[f] = ''; });
-  // Default activity_date to today
+  // Default activity_date to today (local timezone, not UTC)
   if (fields.includes('activity_date')) {
-    row['activity_date'] = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    row['activity_date'] = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
   // Default booleans to false
   ['in_crm', 'contact_responded', 'email_opened'].forEach(f => {
