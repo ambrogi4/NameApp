@@ -19,7 +19,6 @@ const StagingTable = forwardRef(function StagingTable({
   onRefreshStagedContacts,
   onPasteRows,
   onNewActivity,
-  onConferenceImport,
   quickFilterText,
 }, ref) {
   const gridRef = useRef(null);
@@ -559,6 +558,26 @@ const StagingTable = forwardRef(function StagingTable({
         gridRef.current?.api?.deselectAll();
       }
 
+      // OC hotkeys: c=cold, n=nurture, p=partner, e=existing, i=internal, a=admin
+      const ocKeyMap = { c: 'cold', n: 'nurture', p: 'partner', e: 'existing', i: 'internal', a: 'admin' };
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && ocKeyMap[e.key.toLowerCase()]) {
+        const api = gridRef.current?.api;
+        const cell = api?.getFocusedCell();
+        if (cell && !cell.rowPinned) {
+          const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
+          if (colId === 'outreach_category') {
+            e.preventDefault();
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode?.data?.id) {
+              const newOC = ocKeyMap[e.key.toLowerCase()];
+              const { id, ...rest } = rowNode.data;
+              onUpdateStagedContact(id, { ...rest, outreach_category: newOC });
+            }
+            return;
+          }
+        }
+      }
+
       // Alt+U: open URL in focused cell
       if (e.altKey && e.key === 'u') {
         e.preventDefault();
@@ -748,14 +767,8 @@ const StagingTable = forwardRef(function StagingTable({
 
   return (
     <div>
-      <div className="staging-summary" style={{ marginBottom: '8px', fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center', position: 'relative' }}>
-        <button
-          onClick={onConferenceImport}
-          style={{ padding: '4px 10px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', position: 'absolute', left: 0 }}
-        >
-          Conference Import
-        </button>
-        <span style={{ width: '100%', textAlign: 'center' }}>{stagedContacts.length} staged | {noMatchCount} no match | {hasMatchCount} has match</span>
+      <div className="staging-summary" style={{ marginBottom: '8px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
+        {stagedContacts.length} staged | {noMatchCount} no match | {hasMatchCount} has match
       </div>
       {(newRowHasData || selectedRows.length > 0 || noMatchCount > 0) && (
         <div className="contact-toolbar">
@@ -773,7 +786,7 @@ const StagingTable = forwardRef(function StagingTable({
             <>
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <button
-                  onClick={() => setOcDropdownOpen(!ocDropdownOpen)}
+                  onClick={(e) => { e.stopPropagation(); setOcDropdownOpen(!ocDropdownOpen); }}
                   className="edit-btn"
                   style={{ minWidth: '80px' }}
                 >
