@@ -22,7 +22,7 @@ class Contact(db.Model):
     country = db.Column(db.Text)
     li_url = db.Column(db.Text)
     photo_url = db.Column(db.Text)
-    in_crm = db.Column(db.Boolean, default=False)
+    sf_owner_status = db.Column(db.Text)  # 'my', 'colleague', 'NISF', or NULL
     index_1 = db.Column(db.Integer)
     index_2 = db.Column(db.Integer)
     outreach_category = db.Column(db.Text)  # cold, nurture, partner, existing, internal, admin
@@ -53,7 +53,7 @@ class Contact(db.Model):
             'country': self.country,
             'li_url': self.li_url,
             'photo_url': self.photo_url,
-            'in_crm': self.in_crm,
+            'sf_owner_status': self.sf_owner_status,
             'index_1': self.index_1,
             'index_2': self.index_2,
             'outreach_category': self.outreach_category,
@@ -84,7 +84,7 @@ class ContactStaging(db.Model):
     country = db.Column(db.Text)
     li_url = db.Column(db.Text)
     photo_url = db.Column(db.Text)
-    in_crm = db.Column(db.Boolean, default=False)
+    sf_owner_status = db.Column(db.Text)  # 'my', 'colleague', 'NISF', or NULL
     index_1 = db.Column(db.Integer)
     index_2 = db.Column(db.Integer)
     outreach_category = db.Column(db.Text)  # cold, nurture, partner, existing, internal, admin
@@ -120,7 +120,7 @@ class ContactStaging(db.Model):
             'country': self.country,
             'li_url': self.li_url,
             'photo_url': self.photo_url,
-            'in_crm': self.in_crm,
+            'sf_owner_status': self.sf_owner_status,
             'index_1': self.index_1,
             'index_2': self.index_2,
             'outreach_category': self.outreach_category,
@@ -152,7 +152,7 @@ class ContactStaging(db.Model):
             'country': self.country,
             'li_url': self.li_url,
             'photo_url': self.photo_url,
-            'in_crm': self.in_crm,
+            'sf_owner_status': self.sf_owner_status,
             'index_1': self.index_1,
             'index_2': self.index_2,
             'outreach_category': self.outreach_category,

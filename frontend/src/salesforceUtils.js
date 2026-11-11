@@ -62,12 +62,12 @@ function escapeCsvField(value) {
 
 /**
  * Generates CSV content for Salesforce export
- * Columns: first, last, title, firm, email, LinkedIn, Country
+ * Columns: first, last, title, firm, email, LinkedIn, Country, mycrm_id
  * @param {Array} contacts - Array of contact objects
  * @returns {string} CSV content with headers
  */
 export function generateSalesforceCsv(contacts) {
-  const headers = ['first', 'last', 'title', 'firm', 'email', 'LinkedIn', 'Country'];
+  const headers = ['first', 'last', 'title', 'firm', 'email', 'LinkedIn', 'Country', 'mycrm_id'];
   const csvRows = [headers.join(',')];
 
   for (const contact of contacts) {
@@ -78,7 +78,8 @@ export function generateSalesforceCsv(contacts) {
       escapeCsvField(contact.firm || ''),
       escapeCsvField(contact.email || ''),
       escapeCsvField(contact.li_url || ''),
-      escapeCsvField(contact.country || '')
+      escapeCsvField(contact.country || ''),
+      escapeCsvField(contact.id || '')
     ];
     csvRows.push(row.join(','));
   }
@@ -124,4 +125,49 @@ export function getWeekAgoDateString() {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   return `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Generates CSV content for Salesforce owner check export
+ * Columns: mycrm_id, first, last, firm, linkedin
+ * @param {Array} contacts - Array of contact objects
+ * @returns {string} CSV content with headers
+ */
+export function generateSfCheckCsv(contacts) {
+  const headers = ['mycrm_id', 'first', 'last', 'firm', 'linkedin'];
+  const csvRows = [headers.join(',')];
+
+  for (const contact of contacts) {
+    const row = [
+      escapeCsvField(contact.id || ''),
+      escapeCsvField(contact.first || ''),
+      escapeCsvField(contact.last || ''),
+      escapeCsvField(contact.firm || ''),
+      escapeCsvField(contact.li_url || '')
+    ];
+    csvRows.push(row.join(','));
+  }
+
+  return csvRows.join('\n');
+}
+
+/**
+ * Triggers browser download of SF check CSV file
+ * @param {Array} contacts - Array of contact objects
+ * @param {string} filename - Desired filename (without .csv extension)
+ */
+export function downloadSfCheckCsv(contacts, filename) {
+  const csv = generateSfCheckCsv(contacts);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+
+  link.href = url;
+  link.download = `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+
+  // Cleanup
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

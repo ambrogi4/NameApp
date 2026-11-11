@@ -401,6 +401,7 @@ const ActivityTable = forwardRef(function ActivityTable({ activities, contacts, 
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}
+          multiSortKey="ctrl"
           rowData={activities}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}

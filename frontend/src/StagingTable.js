@@ -19,6 +19,7 @@ const StagingTable = forwardRef(function StagingTable({
   onRefreshStagedContacts,
   onPasteRows,
   onNewActivity,
+  onResearchCompany,
   quickFilterText,
 }, ref) {
   const gridRef = useRef(null);
@@ -125,6 +126,8 @@ const StagingTable = forwardRef(function StagingTable({
   onNewActivityRef.current = onNewActivity;
   const onRefreshStagedContactsRef = useRef(onRefreshStagedContacts);
   onRefreshStagedContactsRef.current = onRefreshStagedContacts;
+  const onResearchCompanyRef = useRef(onResearchCompany);
+  onResearchCompanyRef.current = onResearchCompany;
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [tagModal, setTagModal] = useState(null); // 'add' | 'delete' | null
@@ -390,11 +393,12 @@ const StagingTable = forwardRef(function StagingTable({
       headerName: 'Flags',
       children: [
         {
-          field: 'in_crm',
-          headerName: 'CRM',
-          width: 60,
+          field: 'sf_owner_status',
+          headerName: 'Own',
+          width: 90,
           editable: true,
-          cellDataType: 'boolean',
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: ['', 'my', 'colleague', 'NISF'] },
         },
         {
           field: 'index_1',
@@ -578,7 +582,7 @@ const StagingTable = forwardRef(function StagingTable({
         }
       }
 
-      // Alt+U: open URL in focused cell
+      // Alt+U: open LinkedIn URL from selected row
       if (e.altKey && e.key === 'u') {
         e.preventDefault();
         e.stopPropagation();
@@ -587,14 +591,31 @@ const StagingTable = forwardRef(function StagingTable({
           const cell = api.getFocusedCell();
           if (cell && !cell.rowPinned) {
             const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
-            if (rowNode) {
-              const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
-              const val = rowNode.data[colId];
-              if (typeof val === 'string' && val.trim()) {
-                let url = val.trim();
+            if (rowNode?.data?.li_url) {
+              let url = rowNode.data.li_url.trim();
+              if (url) {
                 if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
                 window.open(url, '_blank');
               }
+            }
+          }
+        }
+        return;
+      }
+
+      // Alt+I: research company from selected row
+      if (e.altKey && e.key === 'i') {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api && onResearchCompanyRef.current) {
+          const cell = api.getFocusedCell();
+          if (cell && !cell.rowPinned) {
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode?.data?.firm) {
+              const firmName = rowNode.data.firm;
+              const liUrl = rowNode.data.li_url || '';
+              onResearchCompanyRef.current(firmName, liUrl);
             }
           }
         }
@@ -860,6 +881,7 @@ const StagingTable = forwardRef(function StagingTable({
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}
+          multiSortKey="ctrl"
           rowData={stagedContacts}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}

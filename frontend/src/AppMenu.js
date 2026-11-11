@@ -18,6 +18,8 @@ const AppMenu = ({
   onPageBackward,
   onSalesforceExportToday,
   onSalesforceExportWeek,
+  onSfCheckExport,
+  onSfOwnerImport,
 }) => {
   const [openMenu, setOpenMenu] = useState(null);
   const menuRef = useRef(null);
@@ -213,8 +215,8 @@ const AppMenu = ({
             <MenuItem
               label="Soft Refresh"
               shortcut="Alt+J"
-              disabled={!isStagingTab}
-              onClick={() => executeAction(onSoftRefresh, !isStagingTab)}
+              disabled={!isContactsTab && !isStagingTab}
+              onClick={() => executeAction(onSoftRefresh, !isContactsTab && !isStagingTab)}
               indent
             />
             <MenuItem
@@ -234,12 +236,22 @@ const AppMenu = ({
             <div className="app-menu-divider" />
             <div className="app-menu-section-header">Salesforce File</div>
             <MenuItem
-              label="Today's Contacts"
+              label="Check Owner"
+              onClick={() => executeAction(onSfCheckExport)}
+              indent
+            />
+            <MenuItem
+              label="Import Owner Status"
+              onClick={() => executeAction(onSfOwnerImport)}
+              indent
+            />
+            <MenuItem
+              label="Upload Today's Contacts"
               onClick={() => executeAction(onSalesforceExportToday)}
               indent
             />
             <MenuItem
-              label="This Week's Contacts"
+              label="Upload This Week's Contacts"
               onClick={() => executeAction(onSalesforceExportWeek)}
               indent
             />

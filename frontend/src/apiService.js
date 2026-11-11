@@ -63,6 +63,19 @@ export const parseConferenceSpeakers = async (text) => {
   return data.speakers;
 };
 
+export const importSfOwnerStatus = (updates) => apiPost('/contacts/import-sf-owner-status', updates);
+
+export const researchCompany = async (firm, li_url = '') => {
+  const res = await fetch(`${API_URL}/contacts/research-company`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ firm, li_url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+};
+
 // Content
 export const fetchContent = () => apiGet('/content');
 export const createContent = (data) => apiPost('/content', data);

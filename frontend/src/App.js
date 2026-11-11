@@ -9,6 +9,8 @@ import {
   fetchStagedContacts, createStagedContact, createStagedContactsBatch,
   updateStagedContact, deleteStagedContact, promoteStagedContact, promoteStagedContactsBatch,
   fetchDashboardMetrics,
+  importSfOwnerStatus,
+  researchCompany,
 } from './apiService';
 import ContactForm from './ContactForm';
 import ContactTable from './ContactTable';
@@ -28,11 +30,14 @@ import DashboardPage from './DashboardPage';
 import ColdToNurtureModal from './ColdToNurtureModal';
 import AppMenu from './AppMenu';
 import SalesforceValidationModal from './SalesforceValidationModal';
+import SfOwnerImportModal from './SfOwnerImportModal';
+import CompanyResearchModal from './CompanyResearchModal';
 import { findDuplicate, findDuplicates } from './dupeUtils';
 import { confirmBulkDelete, copyRowsToClipboard } from './gridUtils';
 import {
   validateContactsForSalesforce,
   downloadSalesforceCsv,
+  downloadSfCheckCsv,
   getTodayDateString,
   getWeekAgoDateString
 } from './salesforceUtils';
@@ -75,6 +80,8 @@ function App() {
   const [coldToNurtureContact, setColdToNurtureContact] = useState(null);
   const [selectedContactForOC, setSelectedContactForOC] = useState(null);
   const [salesforceValidationErrors, setSalesforceValidationErrors] = useState(null);
+  const [showSfOwnerImportModal, setShowSfOwnerImportModal] = useState(false);
+  const [companyResearchData, setCompanyResearchData] = useState(null);
 
   const contactTableRef = useRef(null);
   const dashboardRef = useRef(null);
@@ -103,10 +110,15 @@ function App() {
       }
       // Alt+K: Conference import
       if (e.key === 'k') { e.preventDefault(); setShowConferenceImport(true); return; }
-      // Alt+S: Focus global search
-      if (e.key === 's') { e.preventDefault(); searchInputRef.current?.focus(); searchInputRef.current?.select(); return; }
       // Alt+X: Clear all filters
       if (e.key === 'x') { e.preventDefault(); handleClearAllFilters(); return; }
+      // Alt+S: Focus search
+      if (e.key === 's') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
       // Direct tab shortcuts
       if (e.key === 'd') { e.preventDefault(); setTab('dashboard'); return; }
       if (e.key === 'a') { e.preventDefault(); setTab('activities'); return; }
@@ -115,11 +127,13 @@ function App() {
       if (e.key === 'n') { e.preventDefault(); setTab('content'); return; }
       if (e.key === 'f') { e.preventDefault(); setTab('filter'); return; }
       if (e.key === 'r') { e.preventDefault(); setTab('reports'); return; }
-      // Alt+J: soft refresh for staging (J for "reJresh" or just available key)
+      // Alt+J: soft refresh (J for "reJresh" or just available key)
       if (e.key === 'j') {
         e.preventDefault();
         if (tab === 'staging') {
           fetchStagedContacts().then(setStagedContacts).catch(console.error);
+        } else if (tab === 'contacts') {
+          fetchContacts().then(setContacts).catch(console.error);
         }
         return;
       }
@@ -429,8 +443,12 @@ function App() {
   }, []);
 
   const handleSoftRefresh = useCallback(() => {
-    stagingTableRef.current?.softRefresh?.();
-  }, []);
+    if (tab === 'staging') {
+      fetchStagedContacts().then(setStagedContacts).catch(console.error);
+    } else if (tab === 'contacts') {
+      fetchContacts().then(setContacts).catch(console.error);
+    }
+  }, [tab]);
 
   // Cold→Nurture handler
   const handleColdToNurtureClick = useCallback(() => {
@@ -620,11 +638,14 @@ function App() {
     const todayContacts = contacts.filter(c => {
       if (!c.created_date) return false;
       const createdDate = c.created_date.slice(0, 10); // Extract YYYY-MM-DD
-      return createdDate === today;
+      // Filter: created today AND sf_owner_status = 'NISF' AND country is not empty
+      return createdDate === today &&
+             c.sf_owner_status === 'NISF' &&
+             c.country && c.country.trim() !== '';
     });
 
     if (todayContacts.length === 0) {
-      alert('No contacts created today.');
+      alert('No contacts created today with sf_owner_status = NISF and non-empty country.');
       return;
     }
 
@@ -644,11 +665,14 @@ function App() {
     const weekContacts = contacts.filter(c => {
       if (!c.created_date) return false;
       const createdDate = c.created_date.slice(0, 10); // Extract YYYY-MM-DD
-      return createdDate >= weekAgo && createdDate <= today;
+      // Filter: created this week AND sf_owner_status = 'NISF' AND country is not empty
+      return createdDate >= weekAgo && createdDate <= today &&
+             c.sf_owner_status === 'NISF' &&
+             c.country && c.country.trim() !== '';
     });
 
     if (weekContacts.length === 0) {
-      alert('No contacts created this week.');
+      alert('No contacts created this week with sf_owner_status = NISF and non-empty country.');
       return;
     }
 
@@ -661,6 +685,60 @@ function App() {
     const filename = `salesforce_week_${today}`;
     downloadSalesforceCsv(weekContacts, filename);
   }, [contacts]);
+
+  const handleSfCheckExport = useCallback(() => {
+    const scope = window.confirm(
+      'Click OK to export only contacts with NULL owner status.\n' +
+      'Click Cancel to export ALL contacts.'
+    );
+
+    const contactsToExport = scope
+      ? contacts.filter(c => c.sf_owner_status === null || c.sf_owner_status === '')
+      : contacts;
+
+    if (contactsToExport.length === 0) {
+      alert(scope ? 'No contacts with NULL owner status.' : 'No contacts to export.');
+      return;
+    }
+
+    const timestamp = getEasternTimestamp();
+    const filename = `sfcheck_${timestamp}`;
+    downloadSfCheckCsv(contactsToExport, filename);
+  }, [contacts]);
+
+  const handleSfOwnerImport = useCallback(async (updates) => {
+    try {
+      const result = await importSfOwnerStatus(updates);
+
+      // Refresh contacts and staged contacts to show updated data
+      const updatedContacts = await fetchContacts();
+      setContacts(updatedContacts);
+
+      const updatedStaged = await fetchStagedContacts();
+      setStagedContacts(updatedStaged);
+
+      return result;
+    } catch (error) {
+      throw new Error(`Import failed: ${error.message}`);
+    }
+  }, []);
+
+  const handleResearchCompany = useCallback(async (firmName, liUrl = '') => {
+    if (!firmName || !firmName.trim()) {
+      alert('No company name to research.');
+      return;
+    }
+
+    setCompanyResearchData({ loading: true, firmName, results: null });
+
+    try {
+      const results = await researchCompany(firmName.trim(), liUrl);
+      setCompanyResearchData({ loading: false, firmName: firmName.trim(), results });
+    } catch (error) {
+      alert(`Company research failed: ${error.message}`);
+      setCompanyResearchData(null);
+    }
+  }, []);
 
   const handleDeleteActivity = (id) => {
     if (!window.confirm('Delete this activity?')) return;
@@ -728,6 +806,8 @@ function App() {
               onPageBackward={handleMenuPageBackward}
               onSalesforceExportToday={handleSalesforceExportToday}
               onSalesforceExportWeek={handleSalesforceExportWeek}
+              onSfCheckExport={handleSfCheckExport}
+              onSfOwnerImport={() => setShowSfOwnerImportModal(true)}
             />
             {showColdToNurtureBtn && (
               <button
@@ -819,6 +899,7 @@ function App() {
               onRefreshStagedContacts={() => fetchStagedContacts().then(setStagedContacts).catch(console.error)}
               onPasteRows={handlePasteStagedContacts}
               onNewActivity={handleNewActivityForContact}
+              onResearchCompany={handleResearchCompany}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -834,6 +915,7 @@ function App() {
               onLinkedInUpdate={(contact) => setLinkedInUpdateContact(contact)}
               onSelectionChange={handleContactSelectionChange}
               onSalesforceExport={handleSalesforceExport}
+              onResearchCompany={handleResearchCompany}
               quickFilterText={quickFilterText}
             />
           </div>
@@ -991,6 +1073,20 @@ function App() {
           <SalesforceValidationModal
             errors={salesforceValidationErrors}
             onClose={() => setSalesforceValidationErrors(null)}
+          />
+        )}
+        {showSfOwnerImportModal && (
+          <SfOwnerImportModal
+            onClose={() => setShowSfOwnerImportModal(false)}
+            onImport={handleSfOwnerImport}
+          />
+        )}
+        {companyResearchData && (
+          <CompanyResearchModal
+            onClose={() => setCompanyResearchData(null)}
+            results={companyResearchData.results}
+            firmName={companyResearchData.firmName}
+            loading={companyResearchData.loading}
           />
         )}
       </div>

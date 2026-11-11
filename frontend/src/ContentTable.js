@@ -303,6 +303,7 @@ const ContentTable = forwardRef(function ContentTable({ content, onUpdateContent
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}
+          multiSortKey="ctrl"
           rowData={content}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}

@@ -14,7 +14,7 @@ export const CONTACT_FIELDS = [
   'first', 'last', 'title', 'firm', 'source', 'outreach_category', 'education',
   'tags', 'comment', 'email', 'phone', 'street', 'city',
   'state', 'zip', 'country', 'li_url', 'photo_url',
-  'in_crm', 'index_1', 'index_2',
+  'sf_owner_status', 'index_1', 'index_2',
 ];
 
 export const ACTIVITY_FIELDS = [
@@ -163,9 +163,11 @@ export function createEmptyRow(fields, overrides = {}) {
     row['activity_date'] = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
   // Default booleans to false
-  ['in_crm', 'contact_responded', 'email_opened'].forEach(f => {
+  ['contact_responded', 'email_opened', 'in_crm'].forEach(f => {
     if (fields.includes(f)) row[f] = false;
   });
+  // Default sf_owner_status to null
+  if (fields.includes('sf_owner_status')) row['sf_owner_status'] = null;
   // Default integers to null
   ['index_1', 'index_2'].forEach(f => {
     if (fields.includes(f)) row[f] = null;

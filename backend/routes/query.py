@@ -37,7 +37,7 @@ def validate_sql_safety(sql):
 NL_QUERY_SYSTEM_PROMPT = '''You are a CRM query interpreter. Given a natural language question about contacts, activities, and content, generate a safe SQL SELECT query.
 
 DATABASE SCHEMA:
-- contact(id, first, last, title, firm, source, education, tags, comment, email, phone, street, city, state, zip, country, li_url, photo_url, in_crm, index_1, index_2, created_date)
+- contact(id, first, last, title, firm, source, education, tags, comment, email, phone, street, city, state, zip, country, li_url, photo_url, sf_owner_status, index_1, index_2, created_date)
 - content(id, type, short_name, title, author, created_date, publish_date, link, tags, comment)
   - type values: 'pdf', 'youtube', 'article', 'podcast', 'webinar'
 - activity(id, contact_id, content_id, activity_date, channel, contact_responded, email_opened, topic, comment, in_crm, created_at)

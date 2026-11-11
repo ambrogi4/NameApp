@@ -22,7 +22,7 @@ CONTACT_FIELDS = [
     'first', 'last', 'title', 'firm', 'source', 'education',
     'tags', 'comment', 'email', 'phone', 'street', 'city',
     'state', 'zip', 'country', 'li_url', 'photo_url',
-    'in_crm', 'index_1', 'index_2', 'outreach_category'
+    'sf_owner_status', 'index_1', 'index_2', 'outreach_category'
 ]
 
 VALID_OUTREACH_CATEGORIES = {'cold', 'nurture', 'partner', 'existing', 'internal', 'admin'}
@@ -317,7 +317,7 @@ def _create_staged_from_data(data):
         country=data.get('country'),
         li_url=data.get('li_url'),
         photo_url=data.get('photo_url'),
-        in_crm=data.get('in_crm', False),
+        sf_owner_status=data.get('sf_owner_status'),
         index_1=data.get('index_1'),
         index_2=data.get('index_2'),
         outreach_category=data.get('outreach_category'),

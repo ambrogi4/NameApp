@@ -5,7 +5,7 @@ import { CONTACT_FIELDS, OUTREACH_CATEGORIES, isPinnedRow, createEmptyRow, copyR
 import SetFilter from './SetFilter';
 import TagModal from './TagModal';
 
-const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, onSelectionChange, onSalesforceExport, quickFilterText, lookupMode, onDismiss }, ref) {
+const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContact, onCreateContact, onPasteRows, onDeleteBatch, onNewActivity, onLinkedInUpdate, onSelectionChange, onSalesforceExport, onResearchCompany, quickFilterText, lookupMode, onDismiss }, ref) {
   const gridRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -111,6 +111,8 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
   onDismissRef.current = onDismiss;
   const onLinkedInUpdateRef = useRef(onLinkedInUpdate);
   onLinkedInUpdateRef.current = onLinkedInUpdate;
+  const onResearchCompanyRef = useRef(onResearchCompany);
+  onResearchCompanyRef.current = onResearchCompany;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
 
@@ -227,11 +229,12 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
       headerName: 'Flags',
       children: [
         {
-          field: 'in_crm',
-          headerName: 'CRM',
-          width: 60,
+          field: 'sf_owner_status',
+          headerName: 'Own',
+          width: 90,
           editable: true,
-          cellDataType: 'boolean',
+          cellEditor: 'agSelectCellEditor',
+          cellEditorParams: { values: ['', 'my', 'colleague', 'NISF'] },
         },
         {
           field: 'index_1',
@@ -416,7 +419,7 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
         }
       }
 
-      // Alt+U: open URL in focused cell
+      // Alt+U: open LinkedIn URL from selected row
       if (e.altKey && e.key === 'u') {
         e.preventDefault();
         e.stopPropagation();
@@ -425,14 +428,31 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
           const cell = api.getFocusedCell();
           if (cell && !cell.rowPinned) {
             const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
-            if (rowNode) {
-              const colId = typeof cell.column.getColId === 'function' ? cell.column.getColId() : cell.column.colId;
-              const val = rowNode.data[colId];
-              if (typeof val === 'string' && val.trim()) {
-                let url = val.trim();
+            if (rowNode?.data?.li_url) {
+              let url = rowNode.data.li_url.trim();
+              if (url) {
                 if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
                 window.open(url, '_blank');
               }
+            }
+          }
+        }
+        return;
+      }
+
+      // Alt+I: research company from selected row
+      if (e.altKey && e.key === 'i') {
+        e.preventDefault();
+        e.stopPropagation();
+        const api = gridRef.current?.api;
+        if (api && onResearchCompanyRef.current) {
+          const cell = api.getFocusedCell();
+          if (cell && !cell.rowPinned) {
+            const rowNode = api.getDisplayedRowAtIndex(cell.rowIndex);
+            if (rowNode?.data?.firm) {
+              const firmName = rowNode.data.firm;
+              const liUrl = rowNode.data.li_url || '';
+              onResearchCompanyRef.current(firmName, liUrl);
             }
           }
         }
@@ -582,6 +602,7 @@ const ContactTable = forwardRef(function ContactTable({ contacts, onUpdateContac
         <AgGridReact
           ref={gridRef}
           theme={themeBalham}
+          multiSortKey="ctrl"
           rowData={contacts}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}

@@ -1,4 +1,5 @@
 import json
+import re
 from flask import Blueprint, request, jsonify
 import anthropic
 
@@ -36,7 +37,7 @@ def create_contact():
         country=data.get('country'),
         li_url=data.get('li_url'),
         photo_url=data.get('photo_url'),
-        in_crm=data.get('in_crm', False),
+        sf_owner_status=data.get('sf_owner_status'),
         index_1=data.get('index_1'),
         index_2=data.get('index_2'),
         outreach_category=data.get('outreach_category'),
@@ -72,7 +73,7 @@ def create_contacts_batch():
                 country=data.get('country'),
                 li_url=data.get('li_url'),
                 photo_url=data.get('photo_url'),
-                in_crm=data.get('in_crm', False),
+                sf_owner_status=data.get('sf_owner_status'),
                 index_1=data.get('index_1'),
                 index_2=data.get('index_2'),
                 outreach_category=data.get('outreach_category'),
@@ -93,7 +94,7 @@ def update_contact(contact_id):
     for field in ['first', 'last', 'title', 'firm', 'source', 'education',
                   'tags', 'comment', 'email', 'phone', 'street', 'city',
                   'state', 'zip', 'country', 'li_url', 'photo_url',
-                  'in_crm', 'index_1', 'index_2', 'outreach_category']:
+                  'sf_owner_status', 'index_1', 'index_2', 'outreach_category']:
         if field in data:
             setattr(contact, field, data[field])
     db.session.commit()
@@ -106,6 +107,162 @@ def delete_contact(contact_id):
     db.session.delete(contact)
     db.session.commit()
     return jsonify({'message': 'Contact deleted'})
+
+
+@contacts_bp.route('/import-sf-owner-status', methods=['POST'])
+def import_sf_owner_status():
+    """
+    Import Salesforce owner status updates from CSV data.
+    Expects: [{ mycrm_id: int, sf_owner_status: str|null }, ...]
+    Returns: { updated: int, unchanged: int, unknown: int }
+    """
+    from models import ContactStaging
+
+    updates = request.get_json()
+    if not isinstance(updates, list):
+        return jsonify({'error': 'Expected a JSON array'}), 400
+
+    updated = 0
+    unchanged = 0
+    unknown = 0
+
+    for item in updates:
+        mycrm_id = item.get('mycrm_id')
+        sf_owner_status = item.get('sf_owner_status')
+
+        # Try to find in Contact table first
+        contact = Contact.query.get(mycrm_id)
+        if contact:
+            if contact.sf_owner_status == sf_owner_status:
+                unchanged += 1
+            else:
+                contact.sf_owner_status = sf_owner_status
+                updated += 1
+            continue
+
+        # Try ContactStaging table
+        staged = ContactStaging.query.get(mycrm_id)
+        if staged:
+            if staged.sf_owner_status == sf_owner_status:
+                unchanged += 1
+            else:
+                staged.sf_owner_status = sf_owner_status
+                updated += 1
+            continue
+
+        # Not found in either table
+        unknown += 1
+
+    db.session.commit()
+
+    return jsonify({
+        'updated': updated,
+        'unchanged': unchanged,
+        'unknown': unknown
+    })
+
+
+@contacts_bp.route('/research-company', methods=['POST'])
+def research_company():
+    """
+    Research company information using web search + Claude Haiku.
+    Input: { firm: str, li_url: str (optional) }
+    Returns: { companies: [...] } with 0-3 company matches
+    """
+    data = request.get_json()
+    firm_name = (data or {}).get('firm', '').strip()
+    li_url = (data or {}).get('li_url', '').strip()
+
+    if not firm_name:
+        return jsonify({'error': 'Firm name is required'}), 400
+
+    try:
+        from services.llm import call_claude
+    except ImportError:
+        return jsonify({'error': 'LLM service not available'}), 500
+
+    # Build search queries
+    queries = []
+
+    # If LinkedIn URL available, try to anchor to LinkedIn company
+    if li_url:
+        queries.append(f'"{firm_name}" site:linkedin.com/company')
+
+    # Standard company info search
+    queries.append(f'"{firm_name}" headquarters employees CEO')
+
+    # For investment firms, add AUM search
+    if any(term in firm_name.lower() for term in ['capital', 'investment', 'fund', 'asset', 'wealth']):
+        queries.append(f'"{firm_name}" AUM assets under management')
+
+    # Use WebSearch (already available in Claude API)
+    # Note: In production, would use actual web search API here
+    # For now, construct prompt for Claude to simulate search results
+
+    system_prompt = """You are researching companies based on their names.
+Return ONLY a valid JSON array with company information.
+For each company found, extract:
+- Company name (full legal name)
+- Headquarters location (city, state/country)
+- Number of employees (approximate)
+- CEO/Founder name
+- Company type/industry
+- AUM (if investment manager)
+- Brief tagline or description
+
+If multiple companies share similar names, list them separately.
+Return ONLY a JSON array with this structure:
+[
+  {
+    "name": "Company Name Inc.",
+    "hq": "City, State",
+    "employees": "50-100",
+    "ceo": "John Smith",
+    "type": "Investment Manager",
+    "aum": "$500M",
+    "tagline": "Brief description"
+  }
+]
+
+Limit to 3 companies maximum. Return [] if no companies found."""
+
+    user_content = f"Research the company: {firm_name}"
+
+    try:
+        # Get client and call API directly for more control over parsing
+        client = get_claude_client()
+        response = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=2000,
+            system=system_prompt,
+            messages=[{'role': 'user', 'content': user_content}],
+        )
+
+        # Extract response text
+        response_text = response.content[0].text.strip()
+
+        # Remove markdown fences if present
+        if response_text.startswith('```'):
+            response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
+            response_text = re.sub(r'\s*```$', '', response_text)
+
+        # Find the JSON array (everything from first [ to last ])
+        json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+        if json_match:
+            companies = json.loads(json_match.group(0))
+            if isinstance(companies, list):
+                companies = companies[:3]
+            else:
+                companies = []
+        else:
+            companies = []
+
+        return jsonify({'companies': companies, 'firm': firm_name})
+
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Failed to parse company data: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Research failed: {str(e)}'}), 500
 
 
 @contacts_bp.route('/parse-linkedin', methods=['POST'])
